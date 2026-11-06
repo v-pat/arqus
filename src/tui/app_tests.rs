@@ -1,0 +1,175 @@
+use super::*;
+use serde_json::json;
+use std::path::Path;
+
+fn app() -> App {
+    App::new(
+        Path::new("/tmp").to_path_buf(),
+        "/tmp".to_string(),
+        "test-model".to_string(),
+        128_000,
+    )
+}
+
+#[test]
+fn text_deltas_merge_into_one_line() {
+    let mut app = app();
+    app.running = true;
+    app.apply_event(AgentEvent::TextDelta("he".to_string()));
+    app.apply_event(AgentEvent::TextDelta("llo".to_string()));
+
+    assert_eq!(app.lines.len(), 1);
+    assert_eq!(app.lines[0].kind, LineKind::Assistant);
+    assert_eq!(app.lines[0].text, "hello");
+}
+
+#[test]
+fn tool_start_and_end_make_two_lines() {
+    let mut app = app();
+    app.apply_event(AgentEvent::ToolStart {
+        name: "read".to_string(),
+        args: json!({"path": "a.rs"}),
+    });
+    app.apply_event(AgentEvent::ToolEnd {
+        name: "read".to_string(),
+        text: "file body".to_string(),
+        is_error: false,
+    });
+
+    assert_eq!(app.lines.len(), 2);
+    assert_eq!(app.lines[0].kind, LineKind::ToolCall);
+    assert!(app.lines[0].text.contains("read"));
+    assert_eq!(app.lines[1].kind, LineKind::ToolResult);
+    assert!(app.lines[1].text.contains("file body"));
+}
+
+#[test]
+fn tool_result_is_cut_to_ten_lines() {
+    let mut app = app();
+    let text: String = (0..25).map(|i| format!("line {i}\n")).collect();
+    app.apply_event(AgentEvent::ToolEnd {
+        name: "bash".to_string(),
+        text,
+        is_error: false,
+    });
+
+    assert_eq!(app.lines.len(), 11);
+    assert!(app.lines[10].text.contains("15 more lines"));
+}
+
+#[test]
+fn turn_done_stops_running() {
+    let mut app = app();
+    app.running = true;
+    app.apply_event(AgentEvent::TurnDone);
+
+    assert!(!app.running);
+    assert_eq!(app.status, "ready");
+}
+
+#[test]
+fn text_after_a_tool_starts_a_new_line() {
+    let mut app = app();
+    app.apply_event(AgentEvent::TextDelta("first".to_string()));
+    app.apply_event(AgentEvent::ToolStart {
+        name: "bash".to_string(),
+        args: json!({}),
+    });
+    app.apply_event(AgentEvent::TextDelta("second".to_string()));
+
+    assert_eq!(app.lines.len(), 3);
+    assert_eq!(app.lines[0].text, "first");
+    assert_eq!(app.lines[2].text, "second");
+}
+
+#[test]
+fn error_is_red_material_and_can_be_multiline() {
+    let mut app = app();
+    app.apply_event(AgentEvent::ToolEnd {
+        name: "bash".to_string(),
+        text: "boom\nsecond".to_string(),
+        is_error: true,
+    });
+
+    assert_eq!(app.lines.len(), 2);
+    assert_eq!(app.lines[0].kind, LineKind::Error);
+    assert!(app.lines[0].text.contains("boom"));
+}
+
+#[test]
+fn resume_lists_sessions_newest_first_and_picks() {
+    let dir = std::env::temp_dir().join(format!("pirs_tui_{}", crate::session::new_id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("100_a.jsonl"), "").unwrap();
+    std::fs::write(dir.join("300_c.jsonl"), "").unwrap();
+    std::fs::write(dir.join("200_b.jsonl"), "").unwrap();
+
+    let mut app = App::new(
+        dir.clone(),
+        "/tmp".to_string(),
+        "test-model".to_string(),
+        128_000,
+    );
+    assert!(app.start_resume());
+    assert_eq!(app.resume.as_ref().unwrap().paths.len(), 3);
+
+    app.move_resume(1);
+    let picked = app.pick_resume().unwrap();
+    assert_eq!(picked.file_name().unwrap().to_string_lossy(), "200_b.jsonl");
+    assert!(app.resume.is_none());
+}
+
+#[test]
+fn scrolling_follows_until_the_user_scrolls_up() {
+    let mut app = app();
+    app.set_page(2);
+    for i in 0..10 {
+        app.push(LineKind::Info, format!("line {i}"));
+    }
+    assert_eq!(app.scroll, 8);
+
+    app.scroll_up(2);
+    assert_eq!(app.scroll, 6);
+    assert!(!app.follow);
+
+    app.scroll_down(2);
+    assert_eq!(app.scroll, 8);
+    assert!(app.follow);
+}
+
+#[test]
+fn tree_picker_moves_the_leaf_and_shows_the_path() {
+    use crate::session::Session;
+    use crate::types::{EntryKind, Message};
+
+    let dir = std::env::temp_dir().join(format!("pirs_tui_{}", crate::session::new_id()));
+    let mut session = Session::create(&dir, "/tmp").unwrap();
+    session
+        .append(EntryKind::Message {
+            message: Message::User {
+                text: "root".to_string(),
+            },
+        })
+        .unwrap();
+    let second = session
+        .append(EntryKind::Message {
+            message: Message::User {
+                text: "second".to_string(),
+            },
+        })
+        .unwrap();
+
+    let mut app = app();
+    app.set_session(session);
+    assert!(app.start_tree());
+    assert_eq!(app.tree.as_ref().unwrap().rows.len(), 2);
+
+    app.move_tree(1);
+    let path = app.select_tree().unwrap();
+    assert_eq!(path.split(" > ").count(), 2);
+    assert_eq!(
+        app.session.as_ref().unwrap().leaf_id.as_deref(),
+        Some(second.as_str())
+    );
+    assert!(app.tree.is_none());
+}

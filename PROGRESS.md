@@ -1,0 +1,306 @@
+## Stage 0: Skeleton   [DONE]
+- Files created or changed:
+  - `Cargo.toml` (added `dirs`; already had `serde`, `serde_json`, `anyhow`, `uuid`)
+  - `src/system_prompt.rs` (new stub module)
+  - `src/main.rs` (declared `mod system_prompt`, prints `pirs <version>`)
+  - `PROGRESS.md` (this block)
+- What works (command + short real output):
+  - `cargo run` -> `pirs 0.1.0`
+  - `cargo test` -> `test result: ok. 9 passed; 0 failed`
+- Assumptions:
+  - `src/types.rs`, `src/session.rs`, `src/context.rs`, `src/compaction.rs` already existed and work, so they were skipped, not rewritten.
+  - `.gitignore` already contained `/target`.
+- Known problems / TODO:
+  - `src/system_prompt.rs` is only a doc stub; real prompt lands in stage 3.
+- Next stage:
+  - Stage 1: core types in `src/types.rs`.
+
+## Stage 1: Core types   [DONE]
+- Files created or changed:
+  - `src/types.rs` (already existed and matched A7 exactly, so it was not rewritten; appended a `#[cfg(test)] mod tests` block)
+  - `PROGRESS.md` (this block)
+- What works (command + short real output):
+  - `cargo test -- --nocapture` -> `user entry JSON: {"id":"e1000001","parent_id":null,"ts":1762400001000,"type":"message","message":{"role":"user","text":"list the files"}}`
+  - `cargo test` -> `test result: ok. 18 passed; 0 failed`
+  - `cargo clippy --all-targets` -> no warnings
+- Assumptions:
+  - Roundtrip helper takes the value by move and the test compares against `value.clone()`, because `assert_eq!` borrows both sides.
+  - `PROGRESS.md` was updated even though the stage prompt said "do not touch other files", because IRON RULE 11 requires the stage block.
+- Known problems / TODO:
+  - `Header` has no roundtrip test yet; it lands with the session store in stage 2.
+- Next stage:
+  - Stage 2: JSONL session store and tree walking in `src/session.rs`.
+
+## Stage 2: Session store   [DONE]
+- Files created or changed:
+  - `src/session.rs`: kept the starter code (`now_ms`, `new_id`, `project_slug`, `Session`, `path_to_root`) and added `sessions_dir(cwd)` and `latest_session(dir)`. Added a `#[cfg(test)] mod tests` block at the end.
+  - `PROGRESS.md` (this block)
+- What works (command + short real output):
+  - `cargo test` -> `test result: ok. 25 passed; 0 failed`
+  - `cargo clippy --all-targets` -> no warnings
+- Assumptions:
+  - Tests 1 to 5 already lived in `src/main.rs`; the new `session::tests` block covers them plus the new helpers, so the stage is checked in both places.
+  - `sessions_dir` returns `PathBuf` as the brief asks. If `dirs::home_dir()` is `None`, it falls back to `"."` instead of failing.
+  - `latest_session` sorts by file name. Names start with `ts`, so this equals newest-first without reading metadata.
+- Known problems / TODO:
+  - `Header` still has no roundtrip test; `Session::open` exercises it indirectly.
+- Next stage:
+  - Stage 3: `build_context()` and the real system prompt.
+
+## Stage 3: Context and prompt
+- Files created or changed:
+  - `src/context.rs`: kept existing code; added six tests.
+  - `src/system_prompt.rs`: added base prompt and builder.
+  - `PROGRESS.md` (this block)
+- What works (command + short real output):
+  - `cargo test` -> `test result: ok. 32 passed; 0 failed`
+  - `cargo clippy --all-targets` -> no warnings
+- Assumptions:
+  - Compaction test keeps from `u3`; output is 4 messages.
+  - Synthetic result text: No result: this tool call was interrupted.
+  - Prompt appends cwd and date; length is under 1500 chars.
+- Known problems / TODO:
+  - No SYSTEM.md, AGENTS.md or skills loading yet; stage 8.
+- Next stage:
+  - Stage 4: LLM layer in `src/ai/`.
+
+## Stage 4: LLM layer (mock + OpenAI-compatible streaming)   [DONE]
+- Files created or changed:
+  - `Cargo.toml` + `Cargo.lock`: added `tokio` (full), `reqwest` (json, stream), `futures-util`.
+  - `src/ai/mod.rs` (new): `ToolDef`, `LlmRequest`, `ModelConfig::from_env`, `StreamEvent`, `Llm` enum with `async fn stream`.
+  - `src/ai/mock.rs` (new): pops one scripted event list per call.
+  - `src/ai/sse.rs` (new): pure `StreamParser` with `feed_line`, `feed_data`, `finish`.
+  - `src/ai/sse_tests.rs` (new): parser tests, split out to keep `sse.rs` under 300 lines.
+  - `src/ai/openai.rs` (new): `convert_messages`, `build_body`, streaming HTTP client.
+  - `src/main.rs`: temporary `pirs llm-test "<prompt>"`.
+  - `PROGRESS.md` (this block)
+- What works (command + short real output):
+  - `cargo test` -> `test result: ok. 44 passed; 0 failed`
+  - `cargo clippy --all-targets` -> no warnings
+  - `cargo run -- llm-test` with no env -> `error: provider returned 401 Unauthorized: {"error":{"message":"Missing Authentication header","code":401}}` (request reached the endpoint; no key printed)
+- Assumptions:
+  - `provider` comes from optional `PIRS_PROVIDER`, default `openai`. `base_url` default is `https://openrouter.ai/api/v1`; the four required vars still override it.
+  - `ModelConfig` implements `Debug` by hand and prints `api_key: "<redacted>"`, so the derived rule from A4 is intentionally broken for this one type.
+  - `ToolCall` events are emitted in `finish()`, after the stream ends, because the usage chunk arrives after `finish_reason` and the arguments are only complete then.
+  - Assistant messages send `content: ""` and omit `tool_calls` when there are none. `Thinking` blocks become a `reasoning_content` field on the assistant message (the adapter-only quirk).
+  - `usage.prompt_tokens`/`completion_tokens` map to `input`/`output`; `cache_read` and `cache_write` stay 0 until a provider sends them.
+  - `StreamEvent` and the request/config types derive serde; `Llm` does not, because it holds `Arc<Mutex<..>>`.
+- Known problems / TODO:
+  - `llm-test` is temporary; stage 6 replaces it with clap and print mode.
+  - No Anthropic adapter yet.
+- Next stage:
+  - Stage 5: the four tools in `src/tools/`.
+
+## Stage 5: Tools   [DONE]
+- Files created or changed:
+  - `src/tools/mod.rs` (new): `ToolOutput`, `tool_defs()`, `execute()`, arg helpers, `resolve_path`.
+  - `src/tools/read.rs` (new): line window, 50,000 byte cap, truncation hint.
+  - `src/tools/write.rs` (new): creates parents, overwrites.
+  - `src/tools/edit.rs` (new): exactly-one-match replacement.
+  - `src/tools/bash.rs` (new): `sh -c`, timeout, tail truncation, exit code.
+  - `src/tools/tests.rs` (new): dispatch and end-to-end tool tests.
+  - `src/main.rs`: added `mod tools;`.
+  - `PROGRESS.md` (this block)
+- What works (command + short real output):
+  - `cargo test` -> `test result: ok. 64 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s`
+  - `cargo clippy --all-targets` -> `Finished dev profile ...` with no warnings.
+- Assumptions:
+  - `read` `offset` is 1-based, like pi. The truncation hint gives the next 1-based line to request.
+  - A single line longer than 50,000 bytes returns its head and skips that line; the hint says how to continue.
+  - `read` keeps the final newline when it returns the whole file, so write then read gives back the exact text.
+  - `bash` captures stdout and stderr with `Command::output()`, so they are concatenated (stdout first), not interleaved.
+  - The timeout uses `kill_on_drop(true)`, so dropping the timed-out future kills the child.
+  - Tests live in `src/tools/tests.rs` so every tool file stays under 300 lines.
+- Known problems / TODO:
+  - No approval mode; `// TODO: optional approval mode` marks the spot.
+  - No `grep`, `find` or `ls` tools; `bash` covers them.
+- Next stage:
+  - Stage 6: agent loop and `pirs -p` print mode.
+## Stage 6: Agent loop + print mode
+- Files:
+- Cargo.toml: added clap derive
+- src/agent.rs (new): events, config, loop
+- src/main.rs: clap CLI and print mode
+- src/system_prompt.rs: today_utc()
+- What works:
+- cargo test -> 68 passed, 0 failed
+- cargo clippy --all-targets -> no warnings
+- pirs --help shows -p, -c, --no-session
+- Assumptions:
+- mock scripts put ToolCall blocks in Done
+- ToolCall stream events are ignored; Done wins
+- provider errors save an Error assistant entry
+- Known problems:
+- provider error still exits 0 in print mode
+- no compaction yet (TODO stage 7)
+- Next stage: Stage 7 compaction
+
+## Stage 7: Compaction   [DONE]
+- Files created or changed:
+  - `src/compaction.rs`: kept `estimate_tokens`, `should_compact`, `find_cut_point`; added `context_tokens`, `CompactionSettings`, `serialize_conversation`, `extract_file_ops`, `compact`.
+  - `src/compaction_summary.rs` (new): `summary_request` and `generate_summary` (separate, tool-free LLM call).
+  - `src/compaction_tests.rs` (new): serializer, file ops, first/second compaction, custom focus, agent auto-compaction.
+  - `src/ai/mod.rs`, `src/ai/mock.rs`: `Llm::MockCapture` records requests so tests can inspect the summary prompt.
+  - `src/agent.rs`: `AgentEvent::Compacted`, `AgentConfig::compaction`, auto-compaction after each assistant turn, one-shot overflow recovery, `is_context_overflow`.
+  - `src/main.rs`: `pirs -p "/compact [focus]"` manual compaction, `Compacted` print event.
+  - `PROGRESS.md` (this block)
+- What works (command + short real output):
+  - `cargo test` -> `test result: ok. 75 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s`
+  - `cargo clippy --all-targets` -> `Finished dev profile ...` with no warnings.
+- Assumptions:
+  - The summarizer is a normal `Llm` call; tests use the mock, production uses the configured provider.
+  - `extract_file_ops` treats `read` minus (written + edited) as read-only files; lists from earlier `compaction` entries carry forward.
+  - `context_tokens` uses the last assistant `usage.total()` when present, else the sum of `estimate_tokens`.
+  - `agent.rs` compacts after the tool results of a round (or after a final assistant message), never between a tool call and its result.
+  - Manual `/compact` uses default settings and exits without calling the agent loop.
+- Known problems / TODO:
+  - No "turn prefix" summary when the cut lands mid-turn (TODO comment in `compact`).
+  - Print mode still exits 0 after a provider error.
+- Next stage:
+  - Stage 8: `AGENTS.md`, `SYSTEM.md`, skills and prompt templates in `src/resources.rs`.
+
+## Stage 8: AGENTS.md, SYSTEM.md, skills, prompt templates   [DONE]
+- Files created or changed:
+  - `src/resources.rs` (new): `AgentFile`, `Skill`, `Resources`, `load`/`load_in`, AGENTS.md loader, SYSTEM/APPEND loader, skill discovery and frontmatter parser, `skills_block`, `expand_input`.
+  - `src/resources_tests.rs` (new): temp-folder tests for order, fallback, override, broken skills, caps, slash expansion.
+  - `src/system_prompt.rs`: `build_system_prompt` now takes `&Resources` and assembles base/SYSTEM + append + AGENTS blocks + skills + cwd/date.
+  - `src/main.rs`: loads resources, builds the prompt from them, expands slash input before the agent loop.
+  - `src/ai/sse.rs` + `src/ai/sse_tests.rs`: fixed newline-terminated `data:` lines (real streams send `data: [DONE]\n`; the old parser tried to parse `[DONE]\n` as JSON). Added regression test.
+  - `PROGRESS.md` (this block)
+- What works (command + short real output):
+  - `cargo test` -> `test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s`
+  - `cargo clippy --all-targets` -> `Finished dev profile ...` with no warnings.
+  - End-to-end with a local fake SSE provider and one project skill:
+    `PIRS_BASE_URL=http://127.0.0.1:8765/v1 PIRS_API_KEY=test PIRS_MODEL=fake pirs --no-session -p "which skills do you have?"`
+    -> `You have the demo skill.`; server log: `skill_in_prompt=True`, `system_len=1025`.
+- Assumptions:
+  - AGENTS.md order: `~/.pirs/AGENTS.md`, then `<root>/AGENTS.md` ... `<cwd>/AGENTS.md`; `CLAUDE.md` is used when a folder has no `AGENTS.md`.
+  - `SYSTEM.md` and `APPEND_SYSTEM.md`: project `<cwd>/.pirs/` wins; global `~/.pirs/` is the fallback. APPEND is not concatenated from both places.
+  - Skills are sorted by name (`BTreeMap`); project skill overrides global with the same name. Only `name` and `description` are parsed from frontmatter; extra keys are ignored.
+  - Prompt templates: project `<cwd>/.pirs/prompts/name.md` wins over `~/.pirs/prompts/name.md`. Slash names are limited to `[A-Za-z0-9_-]` to block path traversal.
+  - `/compact` remains a built-in and is handled before template expansion. `/skill:name` inlines the whole SKILL.md and appends the rest of the input.
+- Known problems / TODO:
+  - `build_system_prompt` has no byte cap; a very large AGENTS.md is sent on every request (the strategy note tells the human to keep it short).
+  - No slash autocomplete or list command yet.
+  - Print mode still exits 0 after a provider error.
+- Next stage:
+  - Stage 9: ratatui TUI in `src/tui/`.
+
+## Stage 9: ratatui TUI   [DONE]
+- Files created or changed:
+  - `Cargo.toml` + `Cargo.lock`: added `ratatui` 0.30.2 and `crossterm` 0.29 (`event-stream`).
+  - `src/tui/app.rs` (new): `UiLine`, `LineKind`, `Resume`, `App` and the pure `apply_event`.
+  - `src/tui/app_tests.rs` (new): event merging, tool lines, 10-line cut, `TurnDone`, scrolling, resume picker.
+  - `src/tui/ui.rs` (new): transcript, status bar, input box, cursor, resume overlay.
+  - `src/tui/mod.rs` (new): `tokio::select!` loop over keys, agent events, done channel and 100 ms tick.
+  - `src/tui/tasks.rs` (new): spawn/abort/reload helpers (keeps `mod.rs` under 300 lines).
+  - `src/agent.rs`: added `Runtime` (`run`, `compact`, `context_tokens`) so `tui/` never imports `ai/`.
+  - `src/session.rs`: added `list_sessions`; `latest_session` now uses it.
+  - `src/main.rs`: `mod tui`; no-prompt run starts interactive mode.
+  - `PROGRESS.md` (this block)
+- What works (command + short real output):
+  - `cargo test` -> `test result: ok. 98 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s`
+  - `cargo clippy --all-targets` -> `Finished dev profile ...` with no warnings.
+  - Print mode against local Ollama: `PIRS_BASE_URL=http://127.0.0.1:11434/v1 PIRS_API_KEY=ollama PIRS_MODEL=qwen3:8b cargo run --quiet -- --no-session -p "Reply with exactly: hello from pirs"` -> `hello from pirs`
+  - PTY smoke test (100x30): streamed assistant text appeared, `-> bash` and `<- bash` rendered after a tool call, process exited 0, alt screen entered and left, no panic.
+  - PTY abort test: prompt, then Esc -> `aborted` status, UI accepted another prompt, Ctrl+D -> exit 0, terminal restored.
+- Assumptions:
+  - `ratatui::init()` installs its own panic hook, so the terminal is restored on panic; `ratatui::restore()` runs after the loop.
+  - The agent task takes the `Session` out of `App` and sends it back through `done_tx`; Esc aborts the task and reopens the file with `Session::open` (JSONL is append-only).
+  - Scroll offset is a plain line index; fragments are not wrapped, so long lines are clipped at the right edge.
+  - Tool results show at most 10 lines, then `... N more lines`. Newlines become separate dim lines.
+  - `/compact` runs through `Runtime::compact` in a spawned task; "nothing to compact" is reported through `AgentEvent::Error`.
+  - Ctrl+D always quits; Ctrl+C aborts the run while running (otherwise quits); Esc clears a non-running prompt.
+  - `--no-session` keeps `/new` and `/resume` inside the temporary session folder.
+- Known problems / TODO:
+  - No markdown rendering and no text wrapping in the transcript (plain lines, as requested).
+  - Resume picker shows raw file names only, no timestamps or previews.
+  - Status context tokens refresh after each turn, not live during streaming.
+  - Print mode still exits 0 after a provider error.
+- Next stage:
+  - No stage defined after 9. Possible follow-ups: Anthropic adapter, approval mode, markdown rendering.
+
+## Stage 10: Anthropic adapter, model switching, tree and fork   [DONE]
+- Files created or changed:
+  - `src/ai/anthropic.rs` (new): `sanitize_tool_id`, `convert_messages`, `build_body`, streaming HTTP call with `x-api-key` and `anthropic-version: 2023-06-01`.
+  - `src/ai/anthropic_sse.rs` (new): pure `AnthropicParser` for the Anthropic SSE events; text, thinking and split `input_json_delta`.
+  - `src/ai/anthropic_tests.rs` (new): conversion, id sanitizing, body defaults, stream event parsing, stop mapping.
+  - `src/ai/mod.rs`: `Llm::Anthropic`, `Llm::from_config`, `ModelConfig::from_model_spec`, provider-aware default base URL and context window.
+  - `src/tree.rs` + `src/tree_tests.rs` (new): `TreeRow`, depth, 60-character previews, path text, `fork`.
+  - `src/session.rs`: `Session::append_entry` writes an existing entry unchanged.
+  - `src/agent.rs`: `Runtime::switch_model` appends `model_change` and swaps the adapter. Tests moved to `src/agent_tests.rs`.
+  - `src/runtime.rs` (new): the `Runtime` type and its `run`, `compact`, `switch_model`, `context_tokens` methods.
+  - `src/main.rs`: `--model provider:model`, print-mode `/tree`, `/tree <id>`, `/fork`. Tests moved to `src/main_tests.rs`.
+  - `src/tui/app.rs`, `src/tui/tree.rs` (new), `src/tui/ui.rs`, `src/tui/mod.rs`: `/model`, `/tree` picker, `/fork`; tree status shows the new path.
+  - `PROGRESS.md` (this block)
+- What works (command + short real output):
+  - `cargo test` -> `test result: ok. 114 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s`
+  - `cargo clippy --all-targets` -> `Finished dev profile ...` with no warnings.
+  - `cargo run -- --help` shows `--model <PROVIDER:MODEL>`.
+  - `cargo run --quiet -- --no-session -p "/fork"` -> `forked to /var/folders/.../1793991301549_5d9be85d.jsonl`
+  - Live Anthropic call skipped: neither `PIRS_API_KEY` nor `ANTHROPIC_API_KEY` is set.
+- Assumptions:
+  - `PIRS_API_KEY` is the key for every provider, including Anthropic. `PIRS_BASE_URL` still overrides the default `https://api.anthropic.com/v1`.
+  - Missing `PIRS_CONTEXT_WINDOW` defaults to 200000 for Anthropic and 128000 for other providers.
+  - Anthropic tool ids are sanitized by replacing every illegal character with `_` and truncating to 64 characters; the matching result uses the same function, so ids agree.
+  - A thinking-only assistant message is skipped during Anthropic conversion because Anthropic rejects empty content. Thinking blocks are dropped as the brief asks.
+  - Tool results are sent as a user message with an array of `tool_result` blocks; consecutive results merge into one message.
+  - `/tree <id>` in print mode moves the in-memory leaf and prints the path. The selection becomes durable when the next entry is appended; the TUI does this naturally on the next prompt.
+  - Fork copies the current path into the same session directory, keeping ids, parents and timestamps; it writes a new header.
+  - Optional branch summaries on `/tree` are not implemented; the brief marks them optional.
+- Known problems / TODO:
+  - No live Anthropic confirmation yet (no key). The pure conversion and parser tests pass.
+  - The TUI tree list does not scroll independently when the session has many entries.
+  - Print mode still exits 0 after a provider error.
+- Next stage:
+  - Stage 11: pick one polish item (settings file, steering queue, session names, Anthropic thinking signatures, split-turn compaction, or markdown).
+
+## Stage 10 follow-up: OpenRouter provider   [DONE]
+- Files created or changed:
+  - `src/ai/openrouter.rs` (new): `DEFAULT_BASE_URL`, attribution headers, body delegation, streaming call.
+  - `src/ai/openrouter_tests.rs` (new): header rules, OpenAI body reuse, id pass-through.
+  - `src/ai/openai.rs`: `stream` now calls `stream_with_headers`; OpenAI behavior is unchanged.
+  - `src/ai/mod.rs`: `Llm::OpenRouter`, explicit `"openrouter"` routing, shared default base constant, adapter tests.
+  - `PROGRESS.md` (this block)
+- What works (command + short real output):
+  - `cargo test openrouter` -> `test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 114 filtered out`
+  - `cargo test` -> `test result: ok. 117 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s`
+  - `cargo clippy --all-targets` -> no warnings.
+- Assumptions:
+  - OpenRouter speaks the OpenAI chat/completions format, so it reuses the OpenAI converter and SSE parser instead of duplicating them.
+  - `X-Title` defaults to `pirs`; `PIRS_APP_TITLE` overrides it. `HTTP-Referer` is sent only when `PIRS_HTTP_REFERER` is set.
+  - `--model openrouter:<model>` selects the dedicated adapter. Unknown provider names still use the generic OpenAI adapter.
+  - Default base URL for OpenRouter, OpenAI and local compatible servers remains `https://openrouter.ai/api/v1`.
+- Known problems / TODO:
+  - No live OpenRouter call; no key was set in this environment.
+- Next stage:
+  - Stage 11: pick one polish item.
+
+## Stage 11: Settings file   [DONE]
+- Files created or changed:
+  - `src/settings.rs` (new): `Settings`, `CompactionOptions`, `EnvOverrides`; `load`/`load_in`/`overlay`, `compaction_settings`, `EnvOverrides::resolve`.
+  - `src/settings_tests.rs` (new): defaults, project override, folder accumulation, broken file, compaction overlay, precedence.
+  - `src/ai/mod.rs`: `split_model_spec` and `default_context_window` are now public; `from_model_spec` reuses them. Test module moved to `src/ai/mod_tests.rs` to keep the file under 300 lines.
+  - `src/resources.rs`: `load_with`/`load_in_with` scan extra skill folders from settings; `~` means home, a relative path means the project.
+  - `src/resources_tests.rs`: one test for the extra folders.
+  - `src/main.rs`: `mod settings`; both modes load settings and use them for the model, compaction and resources.
+  - `PROGRESS.md` (this block)
+- What works (command + short real output):
+  - `cargo test` -> `test result: ok. 127 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s`
+  - `cargo clippy --all-targets` -> `Finished dev profile ...` with no warnings.
+  - Bad settings model in a temp cwd: `{"model":"no-colon"}` -> `error: model must look like provider:model, got "no-colon"` and exit 1.
+  - Valid settings model in a temp cwd: `{"model":"anthropic:fake-model"}` -> `pirs --no-session -p "/tree"` exits 0.
+- Assumptions:
+  - Precedence: CLI `--model`, then `PIRS_*` environment variables, then project settings, then global settings, then built-in defaults. `PIRS_API_KEY` is the only key source; settings never store it.
+  - Settings `model` uses the same `provider:model` shape as `--model`, so `provider` and `model` resolve together (a CLI flag replaces both).
+  - `skill_folders` from both files accumulate: global folders first, then project ones. A later folder wins on a skill name clash, same rule as project over project-global skills.
+  - A missing settings file is silent. A broken one prints `warning: ignoring <path>: ...` and the other file is still used.
+  - Settings apply at startup. The TUI `/model` command still builds its config from the environment and does not re-read settings.
+- Known problems / TODO:
+  - No settings file is created on first run; the human writes it by hand.
+  - No CLI flag to point at a different settings file.
+  - Print mode still exits 0 after a provider error.
+- Next stage:
+  - No stage defined after 11. Remaining polish items: steering queue, session names, Anthropic thinking signatures, split-turn compaction, markdown rendering.
+
+
