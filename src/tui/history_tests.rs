@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 fn temp_path() -> PathBuf {
-    std::env::temp_dir().join(format!("pirs-history-{}.jsonl", Uuid::new_v4()))
+    std::env::temp_dir().join(format!("arqus-history-{}.jsonl", Uuid::new_v4()))
 }
 
 #[test]

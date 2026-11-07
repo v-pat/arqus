@@ -1,192 +1,247 @@
-//! The keyboard map. One key press in, one state change out.
+//! Our own key type, parser and default key map.
+//!
+//! The rest of the TUI never sees a crossterm type.
 
-use std::path::PathBuf;
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeyCodeX {
+    Char(char),
+    Enter,
+    Esc,
+    Tab,
+    BackTab,
+    Backspace,
+    Delete,
+    Up,
+    Down,
+    Left,
+    Right,
+    Home,
+    End,
+    PageUp,
+    PageDown,
+    F(u8),
+}
 
-use crate::agent::{AgentEvent, Runtime};
-use crate::resources::Resources;
-use crate::safety::Decision;
-use crate::session::Session;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Key {
+    pub code: KeyCodeX,
+    pub ctrl: bool,
+    pub alt: bool,
+    pub shift: bool,
+}
 
-use super::app::App;
-use super::commands::submit;
-use super::tasks::{abort_run, open_session, refresh_tokens};
-
-/// One key press. Returns true when the app should quit.
-#[allow(clippy::too_many_arguments)]
-pub(super) fn handle_key(
-    key: KeyEvent,
-    app: &mut App,
-    runtime: &mut Runtime,
-    resources: &Resources,
-    event_tx: &mpsc::Sender<AgentEvent>,
-    done_tx: &mpsc::Sender<Session>,
-    task: &mut Option<JoinHandle<()>>,
-    active_path: &mut Option<PathBuf>,
-    event_rx: &mut mpsc::Receiver<AgentEvent>,
-) -> bool {
-    let control = key.modifiers.contains(KeyModifiers::CONTROL);
-    let alt = key.modifiers.contains(KeyModifiers::ALT);
-
-    // The approval modal owns the keyboard while it is open.
-    if app.approval.is_some() {
-        match key.code {
-            KeyCode::Char('y') => {
-                app.answer_approval(Decision::Allow);
-            }
-            KeyCode::Char('a') => {
-                app.answer_approval(Decision::AllowAlways);
-            }
-            KeyCode::Char('n') => {
-                if app.answer_approval(Decision::Deny) {
-                    app.info("denied tool call");
-                }
-            }
-            KeyCode::Esc => {
-                app.answer_approval(Decision::Deny);
-                abort_run(app, task, active_path, event_rx);
-                refresh_tokens(app, runtime);
-            }
-            KeyCode::Char('c') if control => {
-                app.answer_approval(Decision::Deny);
-                abort_run(app, task, active_path, event_rx);
-                refresh_tokens(app, runtime);
-            }
-            _ => {}
+impl Key {
+    pub fn new(code: KeyCodeX) -> Key {
+        Key {
+            code,
+            ctrl: false,
+            alt: false,
+            shift: false,
         }
-        return false;
     }
 
-    match key.code {
-        KeyCode::Char('c') if control => {
-            if app.running {
-                let dropped = app.clear_queue();
-                abort_run(app, task, active_path, event_rx);
-                if dropped > 0 {
-                    app.info(format!("aborted; dropped {dropped} queued message(s)"));
-                }
-                refresh_tokens(app, runtime);
-            } else if !app.input.is_empty() {
-                app.input.clear();
-            } else {
-                return app.ctrl_c_idle();
-            }
+    pub fn ctrl(code: KeyCodeX) -> Key {
+        Key {
+            ctrl: true,
+            ..Key::new(code)
         }
-        KeyCode::Char('d') if control => {
-            if app.input.is_empty() {
-                return true;
-            }
-            app.input.delete();
+    }
+
+    pub fn alt(code: KeyCodeX) -> Key {
+        Key {
+            alt: true,
+            ..Key::new(code)
         }
-        KeyCode::Char('j') if control => app.input.insert_newline(),
-        KeyCode::Enter if alt => app.input.insert_newline(),
-        KeyCode::Enter => {
-            if app.tree.is_some() {
-                if let Some(path) = app.select_tree() {
-                    app.info(format!("path: {path}"));
-                }
-            } else if app.resume.is_some() {
-                if let Some(path) = app.pick_resume() {
-                    open_session(app, &path, runtime);
-                }
-            } else if app.running {
-                let text = app.take_input().trim().to_string();
-                if !text.is_empty() {
-                    app.remember_prompt(&text);
-                    if app.queue_prompt(&text) {
-                        app.status = format!("queued ({} waiting)", app.queue.len());
-                    } else {
-                        app.info("cannot queue: no active run");
-                    }
-                }
-            } else {
-                submit(
-                    app,
-                    runtime,
-                    resources,
-                    event_tx,
-                    done_tx,
-                    task,
-                    active_path,
-                );
-                if app.status == "quit" {
-                    return true;
-                }
-            }
+    }
+
+    pub fn shift(code: KeyCodeX) -> Key {
+        Key {
+            shift: true,
+            ..Key::new(code)
         }
-        KeyCode::Char('a') if control => app.input.home(),
-        KeyCode::Char('e') if control => app.input.end(),
-        KeyCode::Char('w') if control => app.input.delete_word(),
-        KeyCode::Char('u') if control => app.input.kill_to_start(),
-        KeyCode::Char('k') if control => app.input.kill_to_end(),
-        KeyCode::Backspace => app.input.backspace(),
-        KeyCode::Delete => app.input.delete(),
-        KeyCode::Tab if app.tree.is_none() && app.resume.is_none() => {
-            app.input.tab_complete();
+    }
+}
+
+/// Convert one crossterm event. Key releases are ignored.
+pub fn from_crossterm(event: KeyEvent) -> Option<Key> {
+    if event.kind == KeyEventKind::Release {
+        return None;
+    }
+    let ctrl = event.modifiers.contains(KeyModifiers::CONTROL);
+    let alt = event.modifiers.contains(KeyModifiers::ALT);
+    let mut shift = event.modifiers.contains(KeyModifiers::SHIFT);
+    let code = match event.code {
+        KeyCode::Char(c) => KeyCodeX::Char(c),
+        KeyCode::Enter => KeyCodeX::Enter,
+        KeyCode::Esc => KeyCodeX::Esc,
+        KeyCode::Tab => KeyCodeX::Tab,
+        KeyCode::BackTab => {
+            shift = true;
+            KeyCodeX::BackTab
         }
-        KeyCode::Left if alt => app.input.word_left(),
-        KeyCode::Right if alt => app.input.word_right(),
-        KeyCode::Left => app.input.move_left(),
-        KeyCode::Right => app.input.move_right(),
-        KeyCode::Home => {
-            if app.input.is_empty() {
-                app.scroll_top();
-            } else {
-                app.input.home();
-            }
+        KeyCode::Backspace => KeyCodeX::Backspace,
+        KeyCode::Delete => KeyCodeX::Delete,
+        KeyCode::Up => KeyCodeX::Up,
+        KeyCode::Down => KeyCodeX::Down,
+        KeyCode::Left => KeyCodeX::Left,
+        KeyCode::Right => KeyCodeX::Right,
+        KeyCode::Home => KeyCodeX::Home,
+        KeyCode::End => KeyCodeX::End,
+        KeyCode::PageUp => KeyCodeX::PageUp,
+        KeyCode::PageDown => KeyCodeX::PageDown,
+        KeyCode::F(n) => KeyCodeX::F(n),
+        _ => return None,
+    };
+    Some(Key {
+        code,
+        ctrl,
+        alt,
+        shift,
+    })
+}
+
+/// Parse `ctrl+p`, `alt+enter`, `shift+tab`, `f2` or one character.
+pub fn parse_key(text: &str) -> Option<Key> {
+    let parts: Vec<&str> = text.split('+').collect();
+    let (modifiers, name) = if parts.len() > 1 {
+        (&parts[..parts.len() - 1], parts[parts.len() - 1])
+    } else {
+        (&parts[..0], parts[0])
+    };
+    if name.is_empty() {
+        return None;
+    }
+    let mut key = Key::new(parse_code(name)?);
+    for modifier in modifiers {
+        match modifier.to_ascii_lowercase().as_str() {
+            "ctrl" | "control" => key.ctrl = true,
+            "alt" | "meta" => key.alt = true,
+            "shift" => key.shift = true,
+            _ => return None,
         }
-        KeyCode::End => {
-            if app.input.is_empty() {
-                app.end_follow();
-            } else {
-                app.input.end();
-            }
-        }
-        KeyCode::PageUp => app.scroll_up(app.page),
-        KeyCode::PageDown => app.scroll_down(app.page),
-        KeyCode::Up if app.tree.is_some() => app.move_tree(-1),
-        KeyCode::Down if app.tree.is_some() => app.move_tree(1),
-        KeyCode::Up if app.resume.is_some() => app.move_resume(-1),
-        KeyCode::Down if app.resume.is_some() => app.move_resume(1),
-        KeyCode::Up => {
-            if app.input.cursor_line() == 0 {
-                app.input.history_up();
-            }
-        }
-        KeyCode::Down => {
-            if app.input.cursor_line() + 1 == app.input.line_count() {
-                app.input.history_down();
-            }
-        }
-        KeyCode::Esc => {
-            if app.tree.is_some() {
-                app.cancel_tree();
-            } else if app.resume.is_some() {
-                app.cancel_resume();
-            } else if app.running {
-                let dropped = app.clear_queue();
-                abort_run(app, task, active_path, event_rx);
-                refresh_tokens(app, runtime);
-                if dropped > 0 {
-                    app.info(format!("aborted; dropped {dropped} queued message(s)"));
-                } else {
-                    app.info("aborted");
-                }
-            } else {
-                app.input.clear();
-            }
-        }
-        KeyCode::Char(c)
-            if !key
-                .modifiers
-                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-        {
-            app.input.insert_char(c);
-        }
+    }
+    if key.shift && key.code == KeyCodeX::Tab {
+        key.code = KeyCodeX::BackTab;
+    }
+    Some(key)
+}
+
+fn parse_code(name: &str) -> Option<KeyCodeX> {
+    let lower = name.to_ascii_lowercase();
+    match lower.as_str() {
+        "enter" | "return" => return Some(KeyCodeX::Enter),
+        "esc" | "escape" => return Some(KeyCodeX::Esc),
+        "tab" => return Some(KeyCodeX::Tab),
+        "backtab" => return Some(KeyCodeX::BackTab),
+        "backspace" => return Some(KeyCodeX::Backspace),
+        "delete" | "del" => return Some(KeyCodeX::Delete),
+        "up" => return Some(KeyCodeX::Up),
+        "down" => return Some(KeyCodeX::Down),
+        "left" => return Some(KeyCodeX::Left),
+        "right" => return Some(KeyCodeX::Right),
+        "home" => return Some(KeyCodeX::Home),
+        "end" => return Some(KeyCodeX::End),
+        "pageup" => return Some(KeyCodeX::PageUp),
+        "pagedown" => return Some(KeyCodeX::PageDown),
         _ => {}
     }
-    false
+    if let Some(number) = lower.strip_prefix('f') {
+        if let Ok(n) = number.parse::<u8>() {
+            if (1..=24).contains(&n) {
+                return Some(KeyCodeX::F(n));
+            }
+        }
+    }
+    let mut chars = name.chars();
+    match (chars.next(), chars.next()) {
+        (Some(c), None) => Some(KeyCodeX::Char(c)),
+        _ => None,
+    }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Action {
+    InputChar(char),
+    Submit,
+    Newline,
+    Escape,
+    Quit,
+    CtrlC,
+    CtrlD,
+    Backspace,
+    Delete,
+    MoveLeft,
+    MoveRight,
+    WordLeft,
+    WordRight,
+    LineStart,
+    LineEnd,
+    DeleteWord,
+    KillToStart,
+    KillToEnd,
+    TabComplete,
+    HistoryUp,
+    HistoryDown,
+    ScrollUp,
+    ScrollDown,
+    ScrollTop,
+    ScrollBottom,
+    Help,
+}
+
+#[derive(Debug, Clone)]
+pub struct KeyMap {
+    bindings: Vec<(Key, Action)>,
+}
+
+impl KeyMap {
+    pub fn defaults() -> KeyMap {
+        use Action::*;
+        use KeyCodeX as C;
+        let mut map = KeyMap {
+            bindings: Vec::new(),
+        };
+        let mut bind = |key: Key, action: Action| map.bindings.push((key, action));
+        bind(Key::new(C::Enter), Submit);
+        bind(Key::alt(C::Enter), Newline);
+        bind(Key::ctrl(C::Char('j')), Newline);
+        bind(Key::new(C::Esc), Escape);
+        bind(Key::ctrl(C::Char('c')), CtrlC);
+        bind(Key::ctrl(C::Char('d')), CtrlD);
+        bind(Key::new(C::Backspace), Backspace);
+        bind(Key::new(C::Delete), Delete);
+        bind(Key::new(C::Tab), TabComplete);
+        bind(Key::new(C::Left), MoveLeft);
+        bind(Key::new(C::Right), MoveRight);
+        bind(Key::alt(C::Left), WordLeft);
+        bind(Key::alt(C::Right), WordRight);
+        bind(Key::ctrl(C::Char('a')), LineStart);
+        bind(Key::ctrl(C::Char('e')), LineEnd);
+        bind(Key::ctrl(C::Char('w')), DeleteWord);
+        bind(Key::ctrl(C::Char('u')), KillToStart);
+        bind(Key::ctrl(C::Char('k')), KillToEnd);
+        bind(Key::new(C::Up), HistoryUp);
+        bind(Key::new(C::Down), HistoryDown);
+        bind(Key::new(C::PageUp), ScrollUp);
+        bind(Key::new(C::PageDown), ScrollDown);
+        bind(Key::new(C::Home), ScrollTop);
+        bind(Key::new(C::End), ScrollBottom);
+        map
+    }
+
+    pub fn action(&self, key: Key) -> Option<Action> {
+        if let Some((_, action)) = self.bindings.iter().find(|(bound, _)| *bound == key) {
+            return Some(*action);
+        }
+        match key.code {
+            KeyCodeX::Char(c) if !key.ctrl && !key.alt => Some(Action::InputChar(c)),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "keys_tests.rs"]
+mod tests;

@@ -45,7 +45,7 @@ impl App {
                 );
             }
             AgentEvent::Notice(text) => {
-                self.push(LineKind::Info, format!("[pirs] {text}"));
+                self.push(LineKind::Info, format!("[arqus] {text}"));
                 self.status = text;
             }
             AgentEvent::UserMessage(text) => {

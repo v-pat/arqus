@@ -4,7 +4,11 @@ use std::path::PathBuf;
 
 use super::approval::Approval;
 use super::input::InputState;
-use super::picker::Resume;
+use super::keys::KeyMap;
+use super::msg::Level;
+use super::overlay::Overlay;
+use super::resume::Resume;
+use super::theme::{ColorDepth, Theme};
 use super::tree::TreeState;
 use super::wrap::build_wrapped;
 use crate::safety::Decision;
@@ -66,6 +70,12 @@ pub struct App {
     pub elapsed_ticks: u64,
     pub resume: Option<Resume>,
     pub tree: Option<TreeState>,
+    /// Dialogs drawn over the screen; the last one owns the keyboard.
+    pub overlays: Vec<Overlay>,
+    pub theme: Theme,
+    pub keymap: KeyMap,
+    /// Set when something changed; the event loop redraws only then.
+    pub dirty: bool,
     pub(crate) assistant_line: Option<usize>,
     pub(crate) thinking_line: Option<usize>,
 }
@@ -99,8 +109,35 @@ impl App {
             elapsed_ticks: 0,
             resume: None,
             tree: None,
+            overlays: Vec::new(),
+            theme: Theme::dark(ColorDepth::True),
+            keymap: KeyMap::defaults(),
+            dirty: true,
             assistant_line: None,
             thinking_line: None,
+        }
+    }
+
+    /// Feed the terminal size to the caches that depend on it.
+    pub fn set_size(&mut self, width: u16, height: u16) {
+        self.set_page(height.saturating_sub(5) as usize);
+        self.set_width(width as usize);
+    }
+
+    pub fn push_overlay(&mut self, overlay: Overlay) {
+        self.overlays.push(overlay);
+        self.dirty = true;
+    }
+
+    pub fn pop_overlay(&mut self) -> Option<Overlay> {
+        self.dirty = true;
+        self.overlays.pop()
+    }
+
+    pub fn toast(&mut self, text: impl Into<String>, level: Level) {
+        self.status = text.into();
+        if level == Level::Error {
+            self.dirty = true;
         }
     }
 
@@ -198,3 +235,7 @@ pub fn display_text(line: &UiLine) -> String {
 #[cfg(test)]
 #[path = "app_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "app_session_tests.rs"]
+mod session_tests;

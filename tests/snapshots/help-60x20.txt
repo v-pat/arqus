@@ -1,0 +1,20 @@
+
+
+  ┌ Shortcuts ───────────────────────────────────────────┐
+  │ enter                    send, or queue while running│
+  │ alt+enter / ctrl+j       newline                     │
+  │ esc                      close dialog / abort run    │
+  │ ctrl+c                   abort / clear / quit twice  │
+  │ ctrl+d                   quit on empty input         │
+  │ ctrl+a / ctrl+e          start / end of line         │
+  │ ctrl+w / ctrl+u / ctrl+k delete word / start / end   │
+  │ up / down                prompt history              │
+  │ pageup / pagedown        scroll transcript           │
+  │ home / end               top / bottom of transcript  │
+  │ ?                        this dialog                 │
+  │                                                      │
+  │ esc close                                            │
+te└──────────────────────────────────────────────────────┘ea
+┌ prompt ──────────────────────────────────────────────────┐
+│                                                          │
+└──────────────────────────────────────────────────────────┘

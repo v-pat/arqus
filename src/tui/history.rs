@@ -1,4 +1,4 @@
-//! Prompt history: `<PIRS_HOME>/history.jsonl`, one JSON string per line.
+//! Prompt history: `<ARQUS_HOME>/history.jsonl`, one JSON string per line.
 
 use std::path::PathBuf;
 

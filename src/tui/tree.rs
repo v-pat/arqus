@@ -3,11 +3,16 @@
 use crate::tree::{path_text, rows, TreeRow};
 
 use super::app::App;
+use super::picker::{Item, PKey, Picker};
 
-#[derive(Debug, Clone, Default)]
+/// The session tree as a filterable list of entry ids.
+#[derive(Debug, Clone)]
 pub struct TreeState {
-    pub rows: Vec<TreeRow>,
-    pub selected: usize,
+    pub picker: Picker<String>,
+}
+
+fn label(row: &TreeRow) -> String {
+    format!("{}{}: {}", "  ".repeat(row.depth), row.role, row.preview)
 }
 
 impl App {
@@ -22,15 +27,24 @@ impl App {
             self.info("session is empty");
             return false;
         }
-        self.tree = Some(TreeState { rows, selected: 0 });
+        let items = rows
+            .iter()
+            .map(|row| {
+                Item::new(label(row), row.id.clone())
+                    .detail(row.id.clone())
+                    .current(row.on_path)
+            })
+            .collect();
+        self.tree = Some(TreeState {
+            picker: Picker::new("tree", items),
+        });
         true
     }
 
     pub fn move_tree(&mut self, delta: isize) {
         if let Some(state) = &mut self.tree {
-            let last = state.rows.len().saturating_sub(1);
-            let next = state.selected as isize + delta;
-            state.selected = next.clamp(0, last as isize) as usize;
+            let key = if delta < 0 { PKey::Up } else { PKey::Down };
+            state.picker.handle_key(key);
         }
     }
 
@@ -41,7 +55,7 @@ impl App {
     /// Move the session leaf to the selected entry. Returns the new path.
     pub fn select_tree(&mut self) -> Option<String> {
         let state = self.tree.take()?;
-        let id = state.rows.get(state.selected)?.id.clone();
+        let id = state.picker.selected_item()?.value.clone();
 
         let Some(session) = self.session.as_mut() else {
             self.info("no session");
