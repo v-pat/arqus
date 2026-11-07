@@ -25,7 +25,7 @@ fn project_overrides_global_scalars() {
     let home = tmp();
     let project = tmp();
     write(
-        &home.join(".pirs/settings.json"),
+        &home.join("settings.json"),
         r#"{"model":"anthropic:global","compaction":{"reserve_tokens":1000}}"#,
     );
     write(
@@ -45,7 +45,7 @@ fn skill_folders_accumulate() {
     let home = tmp();
     let project = tmp();
     write(
-        &home.join(".pirs/settings.json"),
+        &home.join("settings.json"),
         r#"{"skill_folders":["~/shared-skills"]}"#,
     );
     write(
@@ -58,13 +58,28 @@ fn skill_folders_accumulate() {
 }
 
 #[test]
-fn broken_file_is_skipped_without_losing_the_other() {
+fn approval_and_allow_paths_load_and_overlay() {
     let home = tmp();
     let project = tmp();
     write(
-        &home.join(".pirs/settings.json"),
-        r#"{"model":"openai:gpt"}"#,
+        &home.join("settings.json"),
+        r#"{"approval":"ask","allow_paths":["~/shared"]}"#,
     );
+    write(
+        &project.join(".pirs/settings.json"),
+        r#"{"approval":"auto","allow_paths":["data"]}"#,
+    );
+
+    let found = Settings::load_in(&home, &project);
+    assert_eq!(found.approval, Some(ApprovalMode::Auto));
+    assert_eq!(found.allow_paths, vec!["~/shared", "data"]);
+}
+
+#[test]
+fn broken_file_is_skipped_without_losing_the_other() {
+    let home = tmp();
+    let project = tmp();
+    write(&home.join("settings.json"), r#"{"model":"openai:gpt"}"#);
     write(&project.join(".pirs/settings.json"), "{ not json");
 
     let found = Settings::load_in(&home, &project);
@@ -143,6 +158,45 @@ fn empty_settings_use_provider_defaults() {
     assert_eq!(cfg.base_url, default_base_url("openai"));
     assert_eq!(cfg.context_window, default_context_window("openai"));
     assert_eq!(cfg.api_key, "");
+}
+
+#[test]
+fn limits_are_read_and_overlaid() {
+    let home = tmp();
+    let project = tmp();
+    write(
+        &home.join("settings.json"),
+        r#"{"limits":{"max_cost_per_run":1.25,"max_rounds":9}}"#,
+    );
+    write(
+        &project.join(".pirs/settings.json"),
+        r#"{"limits":{"max_cost_per_session":7.5,"max_output_tokens":256,"max_tokens_per_run":1000}}"#,
+    );
+
+    let found = Settings::load_in(&home, &project);
+    assert_eq!(found.limits.max_cost_per_run, Some(1.25));
+    assert_eq!(found.limits.max_cost_per_session, Some(7.5));
+    assert_eq!(found.limits.max_rounds, Some(9));
+    assert_eq!(found.limits.max_output_tokens, Some(256));
+    assert_eq!(found.limits.max_tokens_per_run, Some(1000));
+
+    let limits = found.limits(crate::cost::Limits::default());
+    assert_eq!(limits.max_cost_per_run, 1.25);
+    assert_eq!(limits.max_cost_per_session, 7.5);
+    assert_eq!(limits.max_rounds, 9);
+    assert_eq!(limits.max_output_tokens, 256);
+    assert_eq!(limits.max_tokens_per_run, 1000);
+}
+
+#[test]
+fn settings_model_keeps_colons_after_the_provider() {
+    let settings = Settings {
+        model: Some("openrouter:deepseek/deepseek-v4-flash:free".to_string()),
+        ..Default::default()
+    };
+    let cfg = EnvOverrides::default().resolve(&settings, None).unwrap();
+    assert_eq!(cfg.provider, "openrouter");
+    assert_eq!(cfg.model, "deepseek/deepseek-v4-flash:free");
 }
 
 #[test]

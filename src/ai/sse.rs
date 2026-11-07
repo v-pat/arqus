@@ -24,6 +24,8 @@ pub struct StreamParser {
     usage: Usage,
     stop: StopReason,
     finished: bool,
+    /// True once a chunk carried a `finish_reason`.
+    saw_finish: bool,
     /// True after `data: [DONE]`.
     pub done: bool,
 }
@@ -39,8 +41,15 @@ impl StreamParser {
             usage: Usage::default(),
             stop: StopReason::Stop,
             finished: false,
+            saw_finish: false,
             done: false,
         }
+    }
+
+    /// True once the stream reported a `finish_reason`. A stream that ends
+    /// after it is complete even without `data: [DONE]`.
+    pub fn saw_finish(&self) -> bool {
+        self.saw_finish
     }
 
     /// Parse one raw SSE line. Lines that are not `data:` are ignored.
@@ -68,15 +77,31 @@ impl StreamParser {
         };
 
         if let Some(err) = value.get("error") {
-            return vec![StreamEvent::Error(format!("provider error: {err}"))];
+            // An error chunk can repeat finish_reason. Treat it as the end of
+            // the stream so a following close is not reported twice.
+            self.saw_finish = true;
+            self.stop = StopReason::Error;
+            return vec![StreamEvent::Error(provider_error_text(err))];
         }
 
         if let Some(usage) = value.get("usage").filter(|u| !u.is_null()) {
+            // OpenRouter and OpenAI include cached tokens inside
+            // `prompt_tokens`; subtract them so `Usage::total()` stays right.
+            let cached = usage
+                .get("prompt_tokens_details")
+                .and_then(|details| details.get("cached_tokens"))
+                .and_then(Value::as_u64)
+                .unwrap_or(0);
             if let Some(n) = usage.get("prompt_tokens").and_then(Value::as_u64) {
-                self.usage.input = n;
+                self.usage.input = n.saturating_sub(cached);
             }
+            self.usage.cache_read = cached;
             if let Some(n) = usage.get("completion_tokens").and_then(Value::as_u64) {
                 self.usage.output = n;
+            }
+            // OpenRouter reports the request cost in credits (roughly dollars).
+            if let Some(cost) = usage.get("cost").and_then(Value::as_f64) {
+                self.usage.cost = Some(cost);
             }
         }
 
@@ -122,9 +147,11 @@ impl StreamParser {
         }
 
         if let Some(reason) = choice.get("finish_reason").and_then(Value::as_str) {
+            self.saw_finish = true;
             self.stop = match reason {
                 "tool_calls" => StopReason::ToolUse,
                 "length" => StopReason::Length,
+                "error" => StopReason::Error,
                 _ => StopReason::Stop,
             };
         }
@@ -161,13 +188,9 @@ impl StreamParser {
             } else {
                 match serde_json::from_str(&fragment.args) {
                     Ok(value) => value,
-                    Err(err) => {
-                        events.push(StreamEvent::Error(format!(
-                            "bad arguments for tool {}: {err}",
-                            fragment.name
-                        )));
-                        Value::Null
-                    }
+                    // Keep the raw text. `tools::execute` turns it into an
+                    // error result, so the loop can continue (A15).
+                    Err(_) => Value::String(fragment.args.clone()),
                 }
             };
             events.push(StreamEvent::ToolCall {
@@ -195,6 +218,25 @@ impl StreamParser {
             stop: self.stop.clone(),
         }));
         events
+    }
+}
+
+/// One readable line for a provider error object:
+/// `provider error: Provider disconnected (502)`.
+fn provider_error_text(err: &Value) -> String {
+    let message = err
+        .get("message")
+        .and_then(Value::as_str)
+        .map(|text| text.to_string())
+        .unwrap_or_else(|| err.to_string());
+    let code = match err.get("code") {
+        Some(Value::String(text)) => Some(text.clone()),
+        Some(value) if !value.is_null() => Some(value.to_string()),
+        _ => None,
+    };
+    match code {
+        Some(code) => format!("provider error: {message} ({code})"),
+        None => format!("provider error: {message}"),
     }
 }
 

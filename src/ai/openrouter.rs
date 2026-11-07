@@ -2,12 +2,11 @@
 //! and SSE parsing stay in `openai.rs`. This module owns the provider name,
 //! the default endpoint, and the optional attribution headers.
 
-use anyhow::Result;
 use serde_json::Value;
 use tokio::sync::mpsc::Sender;
 
 use super::openai;
-use super::{LlmRequest, ModelConfig, StreamEvent};
+use super::{LlmError, LlmRequest, ModelConfig, RetrySettings, StreamEvent};
 
 pub const DEFAULT_BASE_URL: &str = "https://openrouter.ai/api/v1";
 pub const APP_TITLE: &str = "pirs";
@@ -40,8 +39,64 @@ pub fn build_body(cfg: &ModelConfig, req: &LlmRequest) -> Value {
 }
 
 /// Stream with the OpenAI parser plus OpenRouter headers.
-pub async fn stream(cfg: &ModelConfig, req: LlmRequest, tx: Sender<StreamEvent>) -> Result<()> {
+pub async fn stream(
+    cfg: &ModelConfig,
+    req: LlmRequest,
+    tx: Sender<StreamEvent>,
+) -> std::result::Result<(), LlmError> {
     openai::stream_with_headers(cfg, req, tx, &extra_headers()).await
+}
+
+/// `GET {base_url}/key`: how much the key may still spend.
+/// One line, so a failed request is easy to show.
+pub async fn budget(cfg: &ModelConfig) -> anyhow::Result<String> {
+    if cfg.provider != "openrouter" {
+        anyhow::bail!("budget: only available for the openrouter provider");
+    }
+    let url = format!("{}/key", cfg.base_url.trim_end_matches('/'));
+    let settings = RetrySettings::from_env();
+    let client = reqwest::Client::builder()
+        .connect_timeout(settings.connect())
+        .build()
+        .map_err(|err| anyhow::anyhow!("budget: cannot build HTTP client: {err}"))?;
+    let response = tokio::time::timeout(
+        settings.idle,
+        client.get(&url).bearer_auth(&cfg.api_key).send(),
+    )
+    .await
+    .map_err(|_| anyhow::anyhow!("budget: request timed out"))?
+    .map_err(|err| anyhow::anyhow!("budget: request failed: {err}"))?;
+    let status = response.status();
+    if !status.is_success() {
+        anyhow::bail!("budget: request failed with HTTP {}", status.as_u16());
+    }
+    let value: Value = tokio::time::timeout(settings.idle, response.json())
+        .await
+        .map_err(|_| anyhow::anyhow!("budget: reading the response timed out"))?
+        .map_err(|err| anyhow::anyhow!("budget: invalid response: {err}"))?;
+    Ok(budget_line(&value))
+}
+
+/// `limit_remaining=... limit=... usage_daily=...` from the `/key` payload.
+/// A null `limit_remaining` means the key has no spending limit.
+pub fn budget_line(value: &Value) -> String {
+    let data = value.get("data").unwrap_or(value);
+    format!(
+        "limit_remaining={} limit={} usage_daily={}",
+        amount(data.get("limit_remaining"), "no limit"),
+        amount(data.get("limit"), "none"),
+        amount(data.get("usage_daily"), "$0.0000"),
+    )
+}
+
+fn amount(value: Option<&Value>, missing: &str) -> String {
+    match value {
+        Some(Value::Number(number)) => number
+            .as_f64()
+            .map(|n| format!("${n:.4}"))
+            .unwrap_or_else(|| missing.to_string()),
+        _ => missing.to_string(),
+    }
 }
 
 #[cfg(test)]

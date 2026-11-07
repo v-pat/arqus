@@ -99,6 +99,10 @@ pub fn tool_defs() -> Vec<ToolDef> {
 /// Run one tool by name. Unknown names and bad arguments are errors, not panics.
 // TODO: optional approval mode
 pub async fn execute(name: &str, args: &Value, cwd: &Path) -> ToolOutput {
+    // The OpenAI parser keeps unparseable arguments as their raw string.
+    if let Value::String(raw) = args {
+        return ToolOutput::error(format!("tool arguments were not valid JSON: {raw}"));
+    }
     match name {
         "read" => read::run(args, cwd),
         "write" => write::run(args, cwd),
@@ -138,4 +142,32 @@ pub fn resolve_path(cwd: &Path, path: &str) -> PathBuf {
     } else {
         cwd.join(candidate)
     }
+}
+
+/// Largest prefix of `text` of at most `max` bytes, cut on a char boundary.
+///
+/// Slicing a `String` at a raw byte index panics when the index lands inside
+/// a multi-byte character (for example `é` or an emoji). This helper backs up
+/// until the cut is valid UTF-8.
+pub fn truncate_bytes(text: &str, max: usize) -> &str {
+    if text.len() <= max {
+        return text;
+    }
+    let mut end = max;
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
+}
+
+/// Largest suffix of `text` of at most `max` bytes, cut on a char boundary.
+pub fn truncate_from_end(text: &str, max: usize) -> &str {
+    if text.len() <= max {
+        return text;
+    }
+    let mut start = text.len() - max;
+    while start < text.len() && !text.is_char_boundary(start) {
+        start += 1;
+    }
+    &text[start..]
 }

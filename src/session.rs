@@ -1,7 +1,8 @@
 use crate::types::*;
 use anyhow::{Context, Result};
+use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -21,10 +22,11 @@ pub fn project_slug(cwd: &str) -> String {
     cwd.replace(['/', '.'], "-")
 }
 
-/// `~/.pirs/sessions/<slug>/` for the given working directory.
+/// `<PIRS_HOME>/sessions/<slug>/` for the given working directory.
 pub fn sessions_dir(cwd: &str) -> PathBuf {
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    home.join(".pirs").join("sessions").join(project_slug(cwd))
+    crate::home::pirs_home()
+        .join("sessions")
+        .join(project_slug(cwd))
 }
 
 /// Every `.jsonl` session file in `dir`, newest first.
@@ -77,19 +79,31 @@ impl Session {
     }
 
     pub fn open(path: &Path) -> Result<Session> {
-        let reader = BufReader::new(File::open(path).context("cannot open session file")?);
-        let mut lines = reader.lines();
-        let first = lines.next().context("empty session file")??;
-        let header: Header = serde_json::from_str(&first).context("bad header line")?;
+        let bytes = fs::read(path).context("cannot open session file")?;
+        let text = String::from_utf8_lossy(&bytes);
+        let mut lines: Vec<&str> = text.lines().collect();
+        let first = lines.first().copied().context("empty session file")?;
+        let header: Header = serde_json::from_str(first).context("bad header line")?;
+        lines.remove(0);
+        let last = lines.len().saturating_sub(1);
         let mut entries = Vec::new();
-        for line in lines {
-            let line = line?;
+        for (i, line) in lines.iter().enumerate() {
             if line.trim().is_empty() {
                 continue;
             }
-            match serde_json::from_str::<Entry>(&line) {
+            match serde_json::from_str::<Entry>(line) {
                 Ok(e) => entries.push(e),
-                Err(_) => continue, // a half-written last line after a crash: skip it
+                Err(err) => {
+                    // A half-written last line after a crash is expected and silent.
+                    // A bad line in the middle means real corruption: warn and skip.
+                    if i != last {
+                        eprintln!(
+                            "warning: skipping corrupt line {} in {}: {err}",
+                            i + 2,
+                            path.display()
+                        );
+                    }
+                }
             }
         }
         let leaf_id = entries.last().map(|e| e.id.clone());
@@ -135,12 +149,19 @@ impl Session {
 }
 
 /// Walk from `leaf` up to the root. Returns entries ordered root -> leaf.
+/// One id-to-index map is built per call, so a long chain costs O(n).
 pub fn path_to_root<'a>(entries: &'a [Entry], leaf: Option<&str>) -> Vec<&'a Entry> {
+    let index: HashMap<&str, usize> = entries
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (e.id.as_str(), i))
+        .collect();
     let mut out: Vec<&Entry> = Vec::new();
     let mut cur = leaf.map(|s| s.to_string());
     while let Some(id) = cur {
-        match entries.iter().find(|e| e.id == id) {
-            Some(e) => {
+        match index.get(id.as_str()) {
+            Some(&i) => {
+                let e = &entries[i];
                 out.push(e);
                 cur = e.parent_id.clone();
             }
@@ -152,110 +173,5 @@ pub fn path_to_root<'a>(entries: &'a [Entry], leaf: Option<&str>) -> Vec<&'a Ent
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn tmp() -> PathBuf {
-        std::env::temp_dir().join(format!("pirs_session_{}", new_id()))
-    }
-
-    fn user(t: &str) -> EntryKind {
-        EntryKind::Message {
-            message: Message::User {
-                text: t.to_string(),
-            },
-        }
-    }
-
-    fn texts(entries: &[Entry], leaf: Option<&str>) -> Vec<String> {
-        path_to_root(entries, leaf)
-            .into_iter()
-            .map(|e| match &e.kind {
-                EntryKind::Message {
-                    message: Message::User { text },
-                } => text.clone(),
-                _ => "?".to_string(),
-            })
-            .collect()
-    }
-
-    #[test]
-    fn reopen_keeps_entries_and_leaf() {
-        let dir = tmp();
-        let mut s = Session::create(&dir, "/x").unwrap();
-        s.append(user("a")).unwrap();
-        s.append(user("b")).unwrap();
-        let s2 = Session::open(&s.path).unwrap();
-        assert_eq!(s2.entries, s.entries);
-        assert_eq!(s2.leaf_id, s.leaf_id);
-    }
-
-    #[test]
-    fn broken_last_line_is_skipped() {
-        let dir = tmp();
-        let mut s = Session::create(&dir, "/x").unwrap();
-        s.append(user("a")).unwrap();
-        let mut f = OpenOptions::new().append(true).open(&s.path).unwrap();
-        write!(f, "{{\"id\":\"zz\",\"par").unwrap();
-        let s2 = Session::open(&s.path).unwrap();
-        assert_eq!(s2.entries.len(), 1);
-    }
-
-    #[test]
-    fn branch_moves_leaf() {
-        let dir = tmp();
-        let mut s = Session::create(&dir, "/x").unwrap();
-        let a = s.append(user("a")).unwrap();
-        s.append(user("b")).unwrap();
-        s.set_leaf(&a).unwrap();
-        s.append(user("c")).unwrap();
-        assert_eq!(texts(&s.entries, s.leaf_id.as_deref()), vec!["a", "c"]);
-    }
-
-    #[test]
-    fn reopened_leaf_is_last_line() {
-        let dir = tmp();
-        let mut s = Session::create(&dir, "/x").unwrap();
-        s.append(user("a")).unwrap();
-        let b = s.append(user("b")).unwrap();
-        let s2 = Session::open(&s.path).unwrap();
-        assert_eq!(s2.leaf_id.as_deref(), Some(b.as_str()));
-    }
-
-    #[test]
-    fn slug_replaces_slash_and_dot() {
-        assert_eq!(project_slug("/home/me/my.proj"), "-home-me-my-proj");
-    }
-
-    #[test]
-    fn latest_session_picks_newest() {
-        let dir = tmp();
-        fs::create_dir_all(&dir).unwrap();
-        let old = dir.join("100_a.jsonl");
-        let new = dir.join("200_b.jsonl");
-        fs::write(&old, "").unwrap();
-        fs::write(&new, "").unwrap();
-        assert_eq!(latest_session(&dir), Some(new));
-    }
-
-    #[test]
-    fn list_sessions_is_newest_first() {
-        let dir = tmp();
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("100_a.jsonl"), "").unwrap();
-        fs::write(dir.join("300_c.jsonl"), "").unwrap();
-        fs::write(dir.join("200_b.jsonl"), "").unwrap();
-        fs::write(dir.join("notes.txt"), "").unwrap();
-        let names: Vec<String> = list_sessions(&dir)
-            .into_iter()
-            .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
-            .collect();
-        assert_eq!(names, vec!["300_c.jsonl", "200_b.jsonl", "100_a.jsonl"]);
-    }
-
-    #[test]
-    fn sessions_dir_ends_with_slug() {
-        let p = sessions_dir("/home/me/my.proj");
-        assert!(p.ends_with(".pirs/sessions/-home-me-my-proj"));
-    }
-}
+#[path = "session_tests.rs"]
+mod tests;

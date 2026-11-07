@@ -1,0 +1,7 @@
+Implement the function slugify(text) in util.py. The rule is:
+
+1. Lowercase the text.
+2. Replace every run of characters that are not a-z or 0-9 with one hyphen.
+3. Strip leading and trailing hyphens.
+
+Examples: "Hello, World!" becomes "hello-world"; "  A  B  " becomes "a-b"; "Already-slugged" becomes "already-slugged". Keep the existing double() function. Make test_util.py pass.

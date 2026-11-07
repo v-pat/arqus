@@ -2,10 +2,13 @@
 
 use std::path::PathBuf;
 
-use crate::agent::AgentEvent;
-use crate::session::{list_sessions, Session};
-
+use super::approval::Approval;
+use super::input::InputState;
+use super::picker::Resume;
 use super::tree::TreeState;
+use super::wrap::build_wrapped;
+use crate::safety::Decision;
+use crate::session::Session;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineKind {
@@ -22,18 +25,28 @@ pub enum LineKind {
 pub struct UiLine {
     pub kind: LineKind,
     pub text: String,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct Resume {
-    pub paths: Vec<PathBuf>,
-    pub selected: usize,
+    /// Dim style: draw lines inside a fenced code block.
+    pub dim: bool,
 }
 
 /// Everything the UI draws. No ratatui types here.
 pub struct App {
+    /// Pending approval, drawn as a modal over everything else.
+    pub approval: Option<Approval>,
+    /// Reply channel for the running agent.
+    pub approval_tx: Option<tokio::sync::mpsc::Sender<Decision>>,
+    /// Logical lines, as the agent emits them.
     pub lines: Vec<UiLine>,
-    pub input: String,
+    /// `lines` after wrapping to `wrap_width`, ready to draw.
+    pub wrapped: Vec<UiLine>,
+    pub wrap_width: usize,
+    pub input: InputState,
+    /// Prompts typed while a run is active, not yet accepted by the agent.
+    pub queue: Vec<String>,
+    /// Sender to the running turn. `None` when no run is active.
+    pub steer_tx: Option<tokio::sync::mpsc::UnboundedSender<String>>,
+    /// Tick of the first idle Ctrl+C, until the 2 second confirm window ends.
+    pub ctrl_c_tick: Option<u64>,
     pub scroll: usize,
     pub running: bool,
     pub status: String,
@@ -44,19 +57,31 @@ pub struct App {
     pub model: String,
     pub context_tokens: u64,
     pub context_window: u64,
+    /// Session cost in dollars, when any request reported one.
+    pub session_cost: Option<f64>,
     pub page: usize,
     pub follow: bool,
+    /// 100 ms ticks since startup, for the spinner and elapsed time.
+    pub ticks: u64,
+    pub elapsed_ticks: u64,
     pub resume: Option<Resume>,
     pub tree: Option<TreeState>,
-    assistant_line: Option<usize>,
-    thinking_line: Option<usize>,
+    pub(crate) assistant_line: Option<usize>,
+    pub(crate) thinking_line: Option<usize>,
 }
 
 impl App {
     pub fn new(session_dir: PathBuf, cwd: String, model: String, context_window: u64) -> App {
         App {
+            approval: None,
+            approval_tx: None,
             lines: Vec::new(),
-            input: String::new(),
+            wrapped: Vec::new(),
+            wrap_width: 0,
+            input: InputState::new(),
+            queue: Vec::new(),
+            steer_tx: None,
+            ctrl_c_tick: None,
             scroll: 0,
             running: false,
             status: "ready".to_string(),
@@ -67,8 +92,11 @@ impl App {
             model,
             context_tokens: 0,
             context_window,
+            session_cost: None,
             page: 10,
             follow: true,
+            ticks: 0,
+            elapsed_ticks: 0,
             resume: None,
             tree: None,
             assistant_line: None,
@@ -82,11 +110,56 @@ impl App {
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
+        self.session_cost = crate::cost::session_totals(&session.entries).cost;
         self.session = Some(session);
     }
 
     pub fn take_input(&mut self) -> String {
-        std::mem::take(&mut self.input)
+        self.input.take()
+    }
+
+    /// Save a submitted prompt in the history file.
+    pub fn remember_prompt(&mut self, text: &str) {
+        self.input.remember(text);
+    }
+
+    /// Queue a prompt typed during a run. False when no run is listening.
+    pub fn queue_prompt(&mut self, text: &str) -> bool {
+        let sent = match &self.steer_tx {
+            Some(tx) => tx.send(text.to_string()).is_ok(),
+            None => false,
+        };
+        if sent {
+            self.queue.push(text.to_string());
+        }
+        sent
+    }
+
+    /// Drop every queued prompt. Returns how many were dropped.
+    pub fn clear_queue(&mut self) -> usize {
+        let count = self.queue.len();
+        self.queue.clear();
+        count
+    }
+
+    pub(crate) fn dequeue(&mut self, text: &str) {
+        if let Some(pos) = self.queue.iter().position(|queued| queued == text) {
+            self.queue.remove(pos);
+        }
+    }
+
+    /// Ctrl+C with an empty box. Returns true on the second press inside the
+    /// 2 second window; the first press only shows the warning.
+    pub fn ctrl_c_idle(&mut self) -> bool {
+        const WINDOW_TICKS: u64 = 20;
+        if let Some(tick) = self.ctrl_c_tick {
+            if self.ticks.saturating_sub(tick) <= WINDOW_TICKS {
+                return true;
+            }
+        }
+        self.ctrl_c_tick = Some(self.ticks);
+        self.status = "press Ctrl+C again to quit".to_string();
+        false
     }
 
     pub fn push_user(&mut self, text: &str) {
@@ -99,171 +172,27 @@ impl App {
 
     pub fn clear_transcript(&mut self) {
         self.lines.clear();
+        self.wrapped.clear();
         self.scroll = 0;
         self.follow = true;
         self.assistant_line = None;
         self.thinking_line = None;
     }
 
-    pub fn set_page(&mut self, page: usize) {
-        self.page = page.max(1);
-        if self.follow {
-            self.follow_bottom();
-        }
-    }
-
-    pub fn scroll_up(&mut self, lines: usize) {
-        self.follow = false;
-        self.scroll = self.scroll.saturating_sub(lines);
-    }
-
-    pub fn scroll_down(&mut self, lines: usize) {
-        let bottom = self.lines.len().saturating_sub(self.page);
-        self.scroll = (self.scroll + lines).min(bottom);
-        if self.scroll == bottom {
-            self.follow = true;
-        }
-    }
-
-    pub fn start_resume(&mut self) -> bool {
-        let paths = list_sessions(&self.session_dir);
-        if paths.is_empty() {
-            self.info("no sessions for this folder yet");
-            return false;
-        }
-        self.resume = Some(Resume { paths, selected: 0 });
-        true
-    }
-
-    pub fn move_resume(&mut self, delta: isize) {
-        if let Some(resume) = &mut self.resume {
-            let last = resume.paths.len().saturating_sub(1);
-            let next = resume.selected as isize + delta;
-            resume.selected = next.clamp(0, last as isize) as usize;
-        }
-    }
-
-    pub fn pick_resume(&mut self) -> Option<PathBuf> {
-        let resume = self.resume.take()?;
-        resume.paths.get(resume.selected).cloned()
-    }
-
-    pub fn cancel_resume(&mut self) {
-        self.resume = None;
-    }
-
-    /// Fold one agent event into the transcript. Pure: no drawing, no I/O.
-    pub fn apply_event(&mut self, ev: AgentEvent) {
-        match ev {
-            AgentEvent::TextDelta(text) => {
-                self.status = "streaming".to_string();
-                self.thinking_line = None;
-                self.assistant_line =
-                    self.append_to(LineKind::Assistant, self.assistant_line, &text);
-            }
-            AgentEvent::ThinkingDelta(text) => {
-                self.assistant_line = None;
-                self.thinking_line = self.append_to(LineKind::Thinking, self.thinking_line, &text);
-            }
-            AgentEvent::ToolStart { name, args } => {
-                self.assistant_line = None;
-                self.thinking_line = None;
-                let args = compact_args(&args);
-                self.push(LineKind::ToolCall, format!("-> {name} {args}"));
-                self.status = format!("tool: {name}");
-            }
-            AgentEvent::ToolEnd {
-                name,
-                text,
-                is_error,
-            } => {
-                self.assistant_line = None;
-                self.thinking_line = None;
-                self.push_result(&name, &text, is_error);
-                self.status = "waiting for model".to_string();
-            }
-            AgentEvent::Compacted { tokens_before } => {
-                if tokens_before > 0 {
-                    self.context_tokens = tokens_before;
-                }
-                self.push(
-                    LineKind::Info,
-                    format!("[compacted conversation: ~{tokens_before} tokens before]"),
-                );
-            }
-            AgentEvent::Error(text) => {
-                self.push(LineKind::Error, format!("error: {text}"));
-                self.status = "error".to_string();
-            }
-            AgentEvent::TurnDone => {
-                self.running = false;
-                self.assistant_line = None;
-                self.thinking_line = None;
-                self.status = "ready".to_string();
-            }
-        }
-    }
-
-    fn push(&mut self, kind: LineKind, text: String) {
-        self.lines.push(UiLine { kind, text });
-        self.follow_bottom();
-    }
-
-    fn follow_bottom(&mut self) {
-        if self.follow {
-            self.scroll = self.lines.len().saturating_sub(self.page);
-        }
-    }
-
-    fn append_to(&mut self, kind: LineKind, index: Option<usize>, text: &str) -> Option<usize> {
-        if let Some(i) = index {
-            if self.lines.get(i).map(|l| l.kind == kind).unwrap_or(false) {
-                self.lines[i].text.push_str(text);
-                self.follow_bottom();
-                return Some(i);
-            }
-        }
-        self.push(kind, text.to_string());
-        self.lines.len().checked_sub(1)
-    }
-
-    fn push_result(&mut self, name: &str, text: &str, is_error: bool) {
-        let kind = if is_error {
-            LineKind::Error
-        } else {
-            LineKind::ToolResult
-        };
-        let head = if is_error {
-            format!("<- {name} [error]: ")
-        } else {
-            format!("<- {name}: ")
-        };
-        let lines: Vec<&str> = text.lines().collect();
-        if lines.is_empty() {
-            self.push(kind, head);
-            return;
-        }
-        for (i, line) in lines.iter().take(10).enumerate() {
-            let prefix = if i == 0 {
-                head.clone()
-            } else {
-                "   ".to_string()
-            };
-            self.push(kind, format!("{prefix}{line}"));
-        }
-        if lines.len() > 10 {
-            self.push(kind, format!("   ... {} more lines", lines.len() - 10));
-        }
+    /// Rebuild the wrapped view from the logical lines. Cheap enough for a
+    /// whole transcript; only called when the lines or the width change.
+    pub fn refresh_wrap(&mut self) {
+        self.wrapped = build_wrapped(&self.lines, self.wrap_width);
     }
 }
 
-fn compact_args(args: &serde_json::Value) -> String {
-    let text = serde_json::to_string(args).unwrap_or_default();
-    let mut out: String = text.chars().take(120).collect();
-    if text.chars().count() > 120 {
-        out.push_str("...");
+/// Text as drawn, including the role prefix used by the transcript.
+pub fn display_text(line: &UiLine) -> String {
+    match line.kind {
+        LineKind::User => format!("> {}", line.text),
+        LineKind::Thinking => format!("  {}", line.text),
+        _ => line.text.clone(),
     }
-    out
 }
 
 #[cfg(test)]

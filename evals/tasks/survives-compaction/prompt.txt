@@ -1,0 +1,7 @@
+Create five files one at a time, using a separate tool call for each file, in this order: step1.txt, step2.txt, step3.txt, step4.txt, step5.txt.
+
+step1.txt must contain only the line: step 1
+
+Each later stepN.txt must contain all the lines of step(N-1).txt, then one new last line: step N
+
+For example, step3.txt must have three lines: step 1, step 2, step 3.

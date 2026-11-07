@@ -52,6 +52,25 @@ fn body_reuses_the_openai_wire_format() {
 }
 
 #[test]
+fn budget_line_shows_the_three_numbers() {
+    let value = json!({"data":{"limit":20.0,"limit_remaining":12.5,"usage_daily":0.25}});
+    let line = budget_line(&value);
+    assert_eq!(
+        line,
+        "limit_remaining=$12.5000 limit=$20.0000 usage_daily=$0.2500"
+    );
+    assert!(line.contains("limit_remaining"));
+}
+
+#[test]
+fn budget_line_says_no_limit_when_remaining_is_null() {
+    let value = json!({"data":{"limit":null,"limit_remaining":null,"usage_daily":0.0}});
+    let line = budget_line(&value);
+    assert!(line.contains("limit_remaining=no limit"), "{line}");
+    assert!(line.contains("limit=none"), "{line}");
+}
+
+#[test]
 fn tool_call_ids_are_not_rewritten() {
     let messages = vec![
         Message::Assistant {

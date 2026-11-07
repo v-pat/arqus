@@ -1,0 +1,8 @@
+{
+  "context_window": 4000,
+  "compaction": {
+    "enabled": true,
+    "reserve_tokens": 500,
+    "keep_recent_tokens": 200
+  }
+}

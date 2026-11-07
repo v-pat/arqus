@@ -244,3 +244,45 @@ run_prompt(session, llm, user_text):
 5. Last lines of `cargo test` output.
 
 ---
+## A13. Test layers
+
+| Layer | What | Runs with | Network | Cost |
+|---|---|---|---|---|
+| L1 unit | pure functions, temp folders | `cargo test` | no | 0 |
+| L2 e2e | the real `pirs` binary against the fake LLM server (`tests/e2e_*.rs`) | `cargo test` | local only | 0 |
+| L3 live | real OpenRouter, tiny requests (`tests/live_*.rs`, all `#[ignore]`) | `cargo test --test live_openrouter -- --ignored --test-threads=1` | yes | cents |
+| L4 evals | small coding tasks with pass/fail (`evals/`) | `python3 evals/run.py` | yes | cents |
+
+Default `cargo test` runs L1 and L2 only. It must NEVER need a network, a real key, or the real `~/.pirs`.
+
+## A14. Cost and secrets rules
+
+1. Never write an API key to a file, a log line, a test, a commit or a message. Debug logs must redact it (stage 12).
+2. Live tests send at most 3 requests each, with `max_tokens` of 300 or less, and fail if one test costs more than 0.05 dollars.
+3. Never put a live call in a loop without a hard cap on iterations and on cost.
+4. Environment variables that tests may set: `PIRS_HOME`, `PIRS_RETRY_BASE_MS`, `PIRS_MAX_RETRIES`, `PIRS_IDLE_TIMEOUT_SECS`, `PIRS_MAX_OUTPUT_TOKENS`, `PIRS_DEBUG`. Live-only: `PIRS_LIVE`, `PIRS_LIVE_MODEL`.
+
+## A15. Bug protocol
+
+When you find a bug (a human report or a live failure): 1) write a test that fails because of it (L1 or L2 first), 2) show it failing, 3) fix the code, 4) show it passing, 5) add one line to `docs/BUGS.md` with symptom, cause, test name. No fix without a test, unless it is impossible to test; then say why.
+
+## A16. Facts about OpenRouter (checked in the OpenRouter docs on 7 Nov 2026)
+
+- The stream may contain comment lines starting with `:` such as `: OPENROUTER PROCESSING`. Ignore them. Never pass them to a JSON parser.
+- Every stream ends with a chunk carrying `usage`, sent just before `[DONE]`. It contains `prompt_tokens` (this INCLUDES cached tokens), `completion_tokens`, `total_tokens`, `cost` (credits, roughly dollars), `prompt_tokens_details.cached_tokens`, `completion_tokens_details.reasoning_tokens`. That chunk has one choice with an empty delta that repeats the `finish_reason`. It is an accounting frame, not a second ending. Be ready for the OpenAI-style variant too: an empty `choices` array plus `usage`.
+- Errors before the first token: a normal HTTP status with JSON `{"error":{"message","code","metadata"}}`. 400 bad request, 401 bad key, 402 no credits or the key's limit is used up, 429 rate limited (a `Retry-After` header may be present), 502 or 503 provider trouble.
+- Errors after the first token: HTTP stays 200. The stream carries a chunk with a top-level `error` object and a choice whose `finish_reason` is `"error"`. It can even be the first and only event. Treat it as a failure.
+- OpenRouter estimates the worst-case cost of a paid request up front using `max_tokens` (or a fixed cap when unset) and can refuse with 402 if that estimate exceeds what the key's limit has left. Always send a modest `max_tokens`.
+- Closing the connection cancels generation for supported providers.
+- `GET {base_url}/key` with the key returns `data.limit`, `data.limit_remaining` (null means unlimited), `data.usage`, `data.usage_daily` and more.
+- Not verified, check live in stage 17: whether the DeepSeek model streams its reasoning as `delta.reasoning` or `delta.reasoning_content`, and whether it rejects a tool-use turn sent back without its reasoning.
+
+## A17. Extra approved crates
+
+`unicode-width` (stage 19 only). Nothing else new. The fake server and test helpers use only the standard library.
+
+## A18. PREFIX for this part
+
+> Read AGENTS.md (including the A13 to A18 addendum) and PROGRESS.md first. Do ONLY the stage below. Follow the IRON RULES. If a file I mention exists, read it and extend it. Every bug fix needs a test first (A15).
+
+---

@@ -289,6 +289,7 @@ mod tests {
                     tokens_before: 1000,
                     read_files: vec!["src/a.rs".to_string()],
                     modified_files: vec!["src/b.rs".to_string()],
+                    summary_usage: None,
                 },
             ),
             user("u6", Some("c5"), "after"),

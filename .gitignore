@@ -1,1 +1,7 @@
 /target
+/evals/results.jsonl
+/test-run
+/.serena
+.DS_Store
+debug.log
+debug.log.1

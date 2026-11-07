@@ -149,6 +149,7 @@ fn compaction_replaces_old_messages() {
         tokens_before: 1000,
         read_files: vec!["a.rs".into()],
         modified_files: vec![],
+        summary_usage: None,
     })
     .unwrap();
     s.append(user("after")).unwrap();

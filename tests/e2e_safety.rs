@@ -1,0 +1,155 @@
+//! Stage 22 safety tests: approvals, the path guard and risky commands,
+//! through the real binary and the fake server.
+
+mod support;
+use support::*;
+
+use std::fs;
+
+use serde_json::json;
+
+fn tool_result_text(body: &str) -> String {
+    let value: serde_json::Value = serde_json::from_str(body).unwrap_or(serde_json::Value::Null);
+    value["messages"]
+        .as_array()
+        .and_then(|messages| {
+            messages.iter().rev().find_map(|message| {
+                if message["role"] == json!("tool") {
+                    message["content"].as_str().map(str::to_string)
+                } else {
+                    None
+                }
+            })
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn print_mode_asks_before_writing() {
+    let project = TempDir::new("ask_project");
+    let home = TempDir::new("ask_home");
+    let fake = FakeLlm::start(vec![
+        Reply::sse(sse_tool_call_json(
+            "call_1",
+            "write",
+            &json!({"path": "inside.txt", "content": "hi"}),
+        )),
+        Reply::sse(sse_text(&["cannot write"])),
+    ]);
+
+    let out = run_pirs_without_yolo(
+        &project.path,
+        &home.path,
+        &fake.url,
+        &["--no-session", "-p", "write a file"],
+        &[],
+    );
+
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
+    assert!(
+        !project.path.join("inside.txt").exists(),
+        "nothing may be written without approval"
+    );
+    let requests = fake.requests();
+    assert_eq!(requests.len(), 2, "the model must see the refusal");
+    let text = tool_result_text(&requests[1].body);
+    assert!(
+        text.contains("Approval required. Run pirs with --yolo to allow this."),
+        "tool result: {text}"
+    );
+}
+
+#[test]
+fn read_never_asks_for_approval() {
+    let project = TempDir::new("read_project");
+    let home = TempDir::new("read_home");
+    fs::write(project.path.join("notes.txt"), "hello from disk").unwrap();
+    let fake = FakeLlm::start(vec![
+        Reply::sse(sse_tool_call_json(
+            "call_1",
+            "read",
+            &json!({"path": "notes.txt"}),
+        )),
+        Reply::sse(sse_text(&["read it"])),
+    ]);
+
+    let out = run_pirs_without_yolo(
+        &project.path,
+        &home.path,
+        &fake.url,
+        &["--no-session", "-p", "read notes"],
+        &[],
+    );
+
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
+    let requests = fake.requests();
+    let text = tool_result_text(&requests[1].body);
+    assert!(text.contains("hello from disk"), "tool result: {text}");
+    assert!(!text.contains("Approval required"), "tool result: {text}");
+}
+
+#[test]
+fn write_outside_the_project_is_refused_even_with_yolo() {
+    let root = TempDir::new("outside_root");
+    let project = root.path.join("project");
+    fs::create_dir_all(&project).unwrap();
+    let home = TempDir::new("outside_home");
+    let fake = FakeLlm::start(vec![
+        Reply::sse(sse_tool_call_json(
+            "call_1",
+            "write",
+            &json!({"path": "../outside.txt", "content": "escape"}),
+        )),
+        Reply::sse(sse_text(&["blocked"])),
+    ]);
+
+    let out = run_pirs(
+        &project,
+        &home.path,
+        &fake.url,
+        &["--no-session", "-p", "write outside"],
+        &[],
+    );
+
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
+    assert!(
+        !root.path.join("outside.txt").exists(),
+        "the path guard must win over --yolo"
+    );
+    let requests = fake.requests();
+    let text = tool_result_text(&requests[1].body);
+    assert!(
+        text.contains("outside the working directory"),
+        "tool result: {text}"
+    );
+}
+
+#[test]
+fn risky_bash_is_refused_in_auto_mode_without_allow_risky() {
+    let project = TempDir::new("risky_project");
+    let home = TempDir::new("risky_home");
+    let fake = FakeLlm::start(vec![
+        Reply::sse(sse_tool_call_json(
+            "call_1",
+            "bash",
+            &json!({"command": "sudo true"}),
+        )),
+        Reply::sse(sse_text(&["blocked"])),
+    ]);
+
+    let out = run_pirs(
+        &project.path,
+        &home.path,
+        &fake.url,
+        &["--no-session", "-p", "try sudo"],
+        &[],
+    );
+
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
+    let requests = fake.requests();
+    let text = tool_result_text(&requests[1].body);
+    assert!(
+        text.contains("refused risky command"),
+        "tool result: {text}"
+    );
+}

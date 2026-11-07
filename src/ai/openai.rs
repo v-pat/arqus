@@ -1,10 +1,11 @@
-use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use serde_json::{json, Value};
 use tokio::sync::mpsc::Sender;
 
 use super::sse::StreamParser;
-use super::{LlmRequest, ModelConfig, StreamEvent, ToolDef};
+use super::{
+    classify_http, LlmError, LlmRequest, ModelConfig, RetrySettings, StreamEvent, ToolDef,
+};
 use crate::types::{Block, Message};
 
 /// Convert neutral messages to the OpenAI chat/completions wire format.
@@ -83,7 +84,11 @@ fn short(text: &str) -> String {
 }
 
 /// POST the request and forward parsed stream events to `tx`.
-pub async fn stream(cfg: &ModelConfig, req: LlmRequest, tx: Sender<StreamEvent>) -> Result<()> {
+pub async fn stream(
+    cfg: &ModelConfig,
+    req: LlmRequest,
+    tx: Sender<StreamEvent>,
+) -> std::result::Result<(), LlmError> {
     stream_with_headers(cfg, req, tx, &[]).await
 }
 
@@ -93,36 +98,68 @@ pub async fn stream_with_headers(
     req: LlmRequest,
     tx: Sender<StreamEvent>,
     headers: &[(&str, String)],
-) -> Result<()> {
+) -> std::result::Result<(), LlmError> {
+    let settings = RetrySettings::from_env();
+    let idle = settings.idle;
+    let idle_text = format!("no data for {}s", idle.as_secs());
     let url = format!("{}/chat/completions", cfg.base_url.trim_end_matches('/'));
-    let client = reqwest::Client::new();
-    let mut request = client
-        .post(&url)
-        .bearer_auth(&cfg.api_key)
-        .json(&build_body(cfg, &req));
+    let body = build_body(cfg, &req);
+    crate::debug::log("request", json!({"url": url, "body": body}));
+    let client = reqwest::Client::builder()
+        .connect_timeout(settings.connect())
+        .build()
+        .map_err(|err| LlmError::Other(format!("cannot build HTTP client: {err}")))?;
+    let mut request = client.post(&url).bearer_auth(&cfg.api_key).json(&body);
     for (name, value) in headers {
         request = request.header(*name, value);
     }
-    let response = request
-        .send()
+    let response = tokio::time::timeout(idle, request.send())
         .await
-        .with_context(|| format!("POST {url} failed"))?;
+        .map_err(|_| LlmError::Network(idle_text.clone()))?
+        .map_err(|err| LlmError::Network(format!("POST {url} failed: {err}")))?;
 
     let status = response.status();
+    let retry_after = response
+        .headers()
+        .get("retry-after")
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string);
+    crate::debug::log("status", json!({"code": status.as_u16()}));
     if !status.is_success() {
-        let body = response.text().await.unwrap_or_default();
-        anyhow::bail!("provider returned {status}: {}", short(&body));
+        let body = tokio::time::timeout(idle, response.text())
+            .await
+            .ok()
+            .and_then(|text| text.ok())
+            .unwrap_or_default();
+        crate::debug::log("error", json!({"text": short(&body)}));
+        return Err(classify_http(
+            status.as_u16(),
+            retry_after.as_deref(),
+            &body,
+        ));
     }
 
     let mut parser = StreamParser::new(&cfg.provider, &cfg.model);
     let mut bytes = response.bytes_stream();
-    let mut buffer = String::new();
+    // Buffer raw BYTES, not text: a network chunk can cut a line or a UTF-8
+    // character in half. Decode only complete lines.
+    let mut buffer: Vec<u8> = Vec::new();
 
-    'read: while let Some(chunk) = bytes.next().await {
-        let chunk = chunk.context("reading response stream")?;
-        buffer.push_str(&String::from_utf8_lossy(&chunk));
-        while let Some(position) = buffer.find('\n') {
-            let line: String = buffer.drain(..=position).collect();
+    'read: loop {
+        let next = tokio::time::timeout(idle, bytes.next()).await;
+        let chunk = match next {
+            Err(_) => return Err(LlmError::Network(idle_text.clone())),
+            Ok(None) => break,
+            Ok(Some(Err(err))) => {
+                return Err(LlmError::Network(format!("reading response stream: {err}")))
+            }
+            Ok(Some(Ok(chunk))) => chunk,
+        };
+        buffer.extend_from_slice(&chunk);
+        while let Some(position) = buffer.iter().position(|b| *b == b'\n') {
+            let line = String::from_utf8_lossy(&buffer.drain(..=position).collect::<Vec<u8>>())
+                .to_string();
+            crate::debug::log("sse", json!({"line": line}));
             for event in parser.feed_line(&line) {
                 if tx.send(event).await.is_err() {
                     return Ok(());
@@ -135,12 +172,21 @@ pub async fn stream_with_headers(
     }
 
     // A stream may end without a trailing newline.
-    if !parser.done && !buffer.trim().is_empty() {
-        for event in parser.feed_line(&buffer) {
+    if !parser.done && buffer.iter().any(|b| !b.is_ascii_whitespace()) {
+        let line = String::from_utf8_lossy(&buffer).to_string();
+        crate::debug::log("sse", json!({"line": line}));
+        for event in parser.feed_line(&line) {
             if tx.send(event).await.is_err() {
                 return Ok(());
             }
         }
+    }
+
+    // No finish_reason and no [DONE]: the server closed the stream mid-answer.
+    if !parser.done && !parser.saw_finish() {
+        let text = "stream ended early: no finish_reason and no [DONE]".to_string();
+        crate::debug::log("error", json!({"text": text}));
+        return Err(LlmError::Stream(text));
     }
 
     for event in parser.finish() {

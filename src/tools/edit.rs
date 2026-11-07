@@ -20,16 +20,35 @@ pub fn run(args: &Value, cwd: &Path) -> ToolOutput {
         Err(err) => return ToolOutput::error(err),
     };
 
+    if old_text.is_empty() {
+        return ToolOutput::error("old_text must not be empty");
+    }
+    if old_text == new_text {
+        return ToolOutput::error("old_text and new_text are the same; nothing to edit");
+    }
+
     let full = resolve_path(cwd, &path);
     let content = match std::fs::read_to_string(&full) {
         Ok(content) => content,
         Err(err) => return ToolOutput::error(format!("could not read {}: {err}", full.display())),
     };
 
-    let count = content.matches(&old_text).count();
+    // A file with CRLF endings is matched as if it used LF, then written back
+    // with the endings it already had.
+    let crlf = content.contains("\r\n");
+    let haystack = if crlf {
+        content.replace("\r\n", "\n")
+    } else {
+        content.clone()
+    };
+    let old_norm = normalize(&old_text);
+    let new_norm = normalize(&new_text);
+
+    let count = haystack.matches(&old_norm).count();
     if count == 0 {
         return ToolOutput::error(format!(
-            "old_text was not found in {path}. Read the file and copy the exact lines."
+            "old_text was not found in {path} ({} lines). Check the exact indentation and whether the file uses tabs or spaces.",
+            haystack.lines().count()
         ));
     }
     if count > 1 {
@@ -38,7 +57,13 @@ pub fn run(args: &Value, cwd: &Path) -> ToolOutput {
         ));
     }
 
-    let updated = content.replacen(&old_text, &new_text, 1);
+    let updated = haystack.replacen(&old_norm, &new_norm, 1);
+    let updated = if crlf {
+        updated.replace('\n', "\r\n")
+    } else {
+        updated
+    };
+
     if let Err(err) = std::fs::write(&full, updated) {
         return ToolOutput::error(format!("could not write {}: {err}", full.display()));
     }
@@ -46,55 +71,10 @@ pub fn run(args: &Value, cwd: &Path) -> ToolOutput {
     ToolOutput::ok(format!("Edited {path}"))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    fn temp_file(name: &str, content: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("pirs_edit_{}_{}", std::process::id(), name));
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join(name), content).unwrap();
-        dir
-    }
-
-    #[test]
-    fn zero_matches_is_error() {
-        let dir = temp_file("zero.txt", "hello\n");
-        let out = run(
-            &json!({"path": "zero.txt", "old_text": "nope", "new_text": "x"}),
-            &dir,
-        );
-        assert!(out.is_error);
-        assert!(out.text.contains("not found"), "{}", out.text);
-        std::fs::remove_dir_all(dir).ok();
-    }
-
-    #[test]
-    fn two_matches_is_error() {
-        let dir = temp_file("two.txt", "a\na\n");
-        let out = run(
-            &json!({"path": "two.txt", "old_text": "a", "new_text": "b"}),
-            &dir,
-        );
-        assert!(out.is_error);
-        assert!(out.text.contains("2 times"), "{}", out.text);
-        std::fs::remove_dir_all(dir).ok();
-    }
-
-    #[test]
-    fn one_match_edits_file() {
-        let dir = temp_file("one.txt", "a\nb\nc\n");
-        let out = run(
-            &json!({"path": "one.txt", "old_text": "b", "new_text": "B"}),
-            &dir,
-        );
-        assert!(!out.is_error, "{}", out.text);
-        assert_eq!(out.text, "Edited one.txt");
-        assert_eq!(
-            std::fs::read_to_string(dir.join("one.txt")).unwrap(),
-            "a\nB\nc\n"
-        );
-        std::fs::remove_dir_all(dir).ok();
-    }
+fn normalize(text: &str) -> String {
+    text.replace("\r\n", "\n")
 }
+
+#[cfg(test)]
+#[path = "edit_tests.rs"]
+mod tests;

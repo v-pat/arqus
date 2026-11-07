@@ -1,0 +1,1 @@
+README.md misspells the word "receive" as "recieve". Fix every occurrence of "recieve" in README.md. Do not change any other text.

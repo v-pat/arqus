@@ -1,4 +1,4 @@
-//! User settings: `~/.pirs/settings.json` and `<cwd>/.pirs/settings.json`.
+//! User settings: `<PIRS_HOME>/settings.json` and `<cwd>/.pirs/settings.json`.
 //!
 //! Precedence, highest first: CLI flag, environment variable, project settings,
 //! global settings, built-in default. The API key is never stored here; it comes
@@ -11,6 +11,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::ai::{default_base_url, default_context_window, split_model_spec, ModelConfig};
 use crate::compaction::CompactionSettings;
+use crate::cost::Limits;
+
+/// `approval` in settings.json: ask (default) or auto.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ApprovalMode {
+    #[default]
+    Ask,
+    Auto,
+}
 
 /// One settings.json file. Every field is optional, so a project file can
 /// override a single key and inherit the rest from the global file.
@@ -25,9 +35,16 @@ pub struct Settings {
     pub context_window: Option<u64>,
     /// Compaction numbers.
     pub compaction: CompactionOptions,
+    /// Cost and token limits.
+    pub limits: LimitOptions,
     /// Extra skill folders. `~` is the home folder; a relative path is
     /// relative to the project.
     pub skill_folders: Vec<String>,
+    /// `ask` (default) or `auto`. `--yolo` also means auto.
+    pub approval: Option<ApprovalMode>,
+    /// Folders outside the project where write and edit are allowed.
+    /// `~` is the home folder; a relative path is relative to the project.
+    pub allow_paths: Vec<String>,
 }
 
 /// The compaction keys inside settings.json.
@@ -39,19 +56,29 @@ pub struct CompactionOptions {
     pub keep_recent_tokens: Option<u64>,
 }
 
+/// The `limits` object inside settings.json.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LimitOptions {
+    pub max_cost_per_run: Option<f64>,
+    pub max_cost_per_session: Option<f64>,
+    pub max_rounds: Option<usize>,
+    pub max_output_tokens: Option<u32>,
+    pub max_tokens_per_run: Option<u64>,
+}
+
 impl Settings {
-    /// Settings for `cwd`, using the real home folder.
+    /// Settings for `cwd`, using the real pirs home folder.
     pub fn load(cwd: &Path) -> Settings {
-        let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-        Settings::load_in(&home, cwd)
+        Settings::load_in(&crate::home::pirs_home(), cwd)
     }
 
-    /// Same as `load`, but with an explicit home folder. Tests use this.
+    /// Same as `load`, but with an explicit pirs home folder. Tests use this.
     /// A missing or broken file is skipped; a broken file prints a warning.
     pub fn load_in(home: &Path, cwd: &Path) -> Settings {
         let mut out = Settings::default();
         let paths = [
-            home.join(".pirs").join("settings.json"),
+            home.join("settings.json"),
             cwd.join(".pirs").join("settings.json"),
         ];
         for path in paths {
@@ -87,7 +114,26 @@ impl Settings {
         if other.compaction.keep_recent_tokens.is_some() {
             self.compaction.keep_recent_tokens = other.compaction.keep_recent_tokens;
         }
+        if other.limits.max_cost_per_run.is_some() {
+            self.limits.max_cost_per_run = other.limits.max_cost_per_run;
+        }
+        if other.limits.max_cost_per_session.is_some() {
+            self.limits.max_cost_per_session = other.limits.max_cost_per_session;
+        }
+        if other.limits.max_rounds.is_some() {
+            self.limits.max_rounds = other.limits.max_rounds;
+        }
+        if other.limits.max_output_tokens.is_some() {
+            self.limits.max_output_tokens = other.limits.max_output_tokens;
+        }
+        if other.limits.max_tokens_per_run.is_some() {
+            self.limits.max_tokens_per_run = other.limits.max_tokens_per_run;
+        }
+        if other.approval.is_some() {
+            self.approval = other.approval;
+        }
         self.skill_folders.extend(other.skill_folders);
+        self.allow_paths.extend(other.allow_paths);
     }
 
     /// Built-in compaction defaults with the settings keys applied.
@@ -101,6 +147,27 @@ impl Settings {
         }
         if let Some(value) = self.compaction.keep_recent_tokens {
             out.keep_recent_tokens = value;
+        }
+        out
+    }
+
+    /// Built-in limits with the settings keys applied.
+    pub fn limits(&self, base: Limits) -> Limits {
+        let mut out = base;
+        if let Some(value) = self.limits.max_cost_per_run {
+            out.max_cost_per_run = value;
+        }
+        if let Some(value) = self.limits.max_cost_per_session {
+            out.max_cost_per_session = value;
+        }
+        if let Some(value) = self.limits.max_rounds {
+            out.max_rounds = value;
+        }
+        if let Some(value) = self.limits.max_output_tokens {
+            out.max_output_tokens = value;
+        }
+        if let Some(value) = self.limits.max_tokens_per_run {
+            out.max_tokens_per_run = value;
         }
         out
     }

@@ -21,6 +21,7 @@ pub(super) fn start_task(
     }
     *active_path = None;
     app.running = true;
+    app.elapsed_ticks = 0;
     app.status = status.to_string();
 }
 
@@ -43,9 +44,15 @@ pub(super) fn spawn_turn(
     let events = event_tx.clone();
     let errors = event_tx.clone();
     let done = done_tx.clone();
+    let (steer_tx, steer_rx) = mpsc::unbounded_channel::<String>();
+    app.steer_tx = Some(steer_tx);
+    let (approval_tx, approval_rx) = mpsc::channel(4);
+    app.approval_tx = Some(approval_tx);
 
     let handle = tokio::spawn(async move {
-        let result = runtime.run(&mut session, text, events).await;
+        let result = runtime
+            .run(&mut session, text, events, steer_rx, approval_rx)
+            .await;
         if let Err(err) = result {
             let _ = errors.send(AgentEvent::Error(format!("{err:#}"))).await;
         }
@@ -101,6 +108,8 @@ pub(super) fn abort_run(
     if let Some(handle) = task.take() {
         handle.abort();
     }
+    app.approval = None;
+    app.approval_tx = None;
     if let Some(path) = active_path.take() {
         match Session::open(&path) {
             Ok(session) => app.set_session(session),
@@ -109,6 +118,7 @@ pub(super) fn abort_run(
     }
     app.running = false;
     app.status = "aborted".to_string();
+    app.steer_tx = None;
     while event_rx.try_recv().is_ok() {}
 }
 

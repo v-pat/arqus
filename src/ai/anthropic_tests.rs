@@ -82,10 +82,45 @@ fn converts_roles_and_merges_consecutive_tool_results() {
             "role": "user",
             "content": [
                 {"type": "tool_result", "tool_use_id": "call_abc_123", "content": "a", "is_error": false},
-                {"type": "tool_result", "tool_use_id": "call_2", "content": "b", "is_error": false}
+                {"type": "tool_result", "tool_use_id": "call_2", "content": "b", "is_error": false},
+                {"type": "text", "text": "thanks"}
+            ]
+        }
+    ]);
+    assert_eq!(got, expected);
+}
+
+#[test]
+fn merges_tool_result_then_user_text_into_one_user_turn() {
+    let messages = vec![
+        Message::Assistant {
+            blocks: vec![call("call_1", "read")],
+            provider: "openai".to_string(),
+            model: "m".to_string(),
+            usage: None,
+            stop: StopReason::ToolUse,
+        },
+        result("call_1", "body"),
+        Message::User {
+            text: "now fix it".to_string(),
+        },
+    ];
+
+    let got = Value::Array(convert_messages(&messages));
+    let expected = json!([
+        {
+            "role": "assistant",
+            "content": [
+                {"type": "tool_use", "id": "call_1", "name": "read", "input": {"path": "a.rs"}}
             ]
         },
-        {"role": "user", "content": "thanks"}
+        {
+            "role": "user",
+            "content": [
+                {"type": "tool_result", "tool_use_id": "call_1", "content": "body", "is_error": false},
+                {"type": "text", "text": "now fix it"}
+            ]
+        }
     ]);
     assert_eq!(got, expected);
 }
@@ -246,6 +281,7 @@ fn parser_collects_text_thinking_and_tool_json() {
                     output: 5,
                     cache_read: 3,
                     cache_write: 0,
+                    cost: None,
                 })
             );
             assert_eq!(

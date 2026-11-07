@@ -24,7 +24,7 @@ fn agents_global_then_root_to_cwd() {
     let project = tmp();
     let sub = project.join("sub");
     fs::create_dir_all(&sub).unwrap();
-    write(&home.join(".pirs/AGENTS.md"), "global");
+    write(&home.join("AGENTS.md"), "global");
     write(&project.join("AGENTS.md"), "outer");
     write(&sub.join("AGENTS.md"), "inner");
 
@@ -52,7 +52,7 @@ fn system_md_replaces_and_append_adds() {
     let project = tmp();
     write(&project.join(".pirs/SYSTEM.md"), "CUSTOM PERSONA");
     write(&project.join(".pirs/APPEND_SYSTEM.md"), "EXTRA RULES");
-    write(&home.join(".pirs/SYSTEM.md"), "GLOBAL PERSONA");
+    write(&home.join("SYSTEM.md"), "GLOBAL PERSONA");
 
     let res = load_in(&home, &project);
     let prompt = build_system_prompt(&res, "/proj", "2026-11-06");
@@ -66,7 +66,7 @@ fn system_md_replaces_and_append_adds() {
 fn global_system_md_is_the_fallback() {
     let home = tmp();
     let project = tmp();
-    write(&home.join(".pirs/SYSTEM.md"), "GLOBAL PERSONA");
+    write(&home.join("SYSTEM.md"), "GLOBAL PERSONA");
 
     let res = load_in(&home, &project);
     let prompt = build_system_prompt(&res, "/proj", "2026-11-06");
@@ -79,7 +79,7 @@ fn project_skill_overrides_global_skill() {
     let home = tmp();
     let project = tmp();
     write(
-        &home.join(".pirs/skills/demo/SKILL.md"),
+        &home.join("skills/demo/SKILL.md"),
         "---\nname: demo\ndescription: global demo\n---\n\nglobal body\n",
     );
     write(
@@ -87,7 +87,7 @@ fn project_skill_overrides_global_skill() {
         "---\nname: demo\ndescription: project demo\n---\n\n# Demo\n\nproject body\n",
     );
     write(
-        &home.join(".pirs/skills/other/SKILL.md"),
+        &home.join("skills/other/SKILL.md"),
         "---\nname: other\ndescription: other skill\n---\n\nbody\n",
     );
 
@@ -104,15 +104,15 @@ fn broken_skills_are_skipped() {
     let home = tmp();
     let project = tmp();
     write(
-        &home.join(".pirs/skills/no-desc/SKILL.md"),
+        &home.join("skills/no-desc/SKILL.md"),
         "---\nname: no-desc\n---\n\nbody\n",
     );
     write(
-        &home.join(".pirs/skills/no-frontmatter/SKILL.md"),
+        &home.join("skills/no-frontmatter/SKILL.md"),
         "# Just a title\n",
     );
     write(
-        &home.join(".pirs/skills/no-name/SKILL.md"),
+        &home.join("skills/no-name/SKILL.md"),
         "---\ndescription: only a description\n---\n",
     );
 
@@ -125,7 +125,7 @@ fn skill_block_lists_name_description_and_path() {
     let home = tmp();
     let project = tmp();
     write(
-        &home.join(".pirs/skills/demo/SKILL.md"),
+        &home.join("skills/demo/SKILL.md"),
         "---\nname: demo\ndescription: use for demos\n---\n\nbody\n",
     );
 
@@ -161,7 +161,7 @@ fn skill_slash_command_inlines_the_skill() {
     let home = tmp();
     let project = tmp();
     write(
-        &home.join(".pirs/skills/demo/SKILL.md"),
+        &home.join("skills/demo/SKILL.md"),
         "---\nname: demo\ndescription: use for demos\n---\n\n# Demo\n\nFollow these steps.\n",
     );
 
@@ -182,7 +182,7 @@ fn prompt_slash_command_replaces_arguments() {
         &project.join(".pirs/prompts/review.md"),
         "Review this: $ARGUMENTS\nThanks.",
     );
-    write(&home.join(".pirs/prompts/global.md"), "Global: $ARGUMENTS");
+    write(&home.join("prompts/global.md"), "Global: $ARGUMENTS");
 
     let res = load_in(&home, &project);
     assert_eq!(
@@ -222,4 +222,29 @@ fn settings_skill_folders_are_scanned() {
     let res = load_in_with(&home, &project, &folders);
     let names: Vec<String> = res.skills.iter().map(|s| s.name.clone()).collect();
     assert_eq!(names, vec!["another", "extra"]);
+}
+
+#[test]
+fn empty_skills_folder_is_not_an_error() {
+    let home = tmp();
+    let project = tmp();
+    fs::create_dir_all(home.join("skills")).unwrap();
+    fs::create_dir_all(project.join(".pirs/skills")).unwrap();
+
+    let res = load_in(&home, &project);
+    assert!(res.skills.is_empty());
+    assert!(skills_block(&res.skills).is_none());
+}
+
+#[test]
+fn prompt_template_with_a_bad_name_never_crashes() {
+    let home = tmp();
+    let project = tmp();
+    write(&project.join(".pirs/prompts/bad name!.md"), "never loaded");
+
+    let res = load_in(&home, &project);
+    assert_eq!(expand_input(&res, "/bad name!"), "/bad name!");
+    assert_eq!(expand_input(&res, "/bad name! rest"), "/bad name! rest");
+    assert_eq!(expand_input(&res, "/../bad"), "/../bad");
+    assert_eq!(expand_input(&res, "/"), "/");
 }

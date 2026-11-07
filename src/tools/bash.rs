@@ -1,16 +1,27 @@
-//! The `bash` tool: run `sh -c` in the working directory.
+//! The `bash` tool: run `sh -c` in its own process group.
+//!
+//! Rust note: `sh -c "sleep 30 &"` leaves children behind after the shell
+//! exits. A process group lets us kill the shell and every child it started
+//! with one `kill -KILL -<pid>`; killing only the shell leaks the children.
 
 use std::path::Path;
 use std::process::Stdio;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
+use tokio::io::AsyncReadExt;
 use tokio::process::Command;
+use tokio::task::JoinHandle;
 
-use super::{arg_str, arg_usize, ToolOutput};
+use super::{arg_str, arg_usize, truncate_from_end, ToolOutput};
 
 pub const DEFAULT_TIMEOUT_SECS: usize = 120;
+pub const MAX_TIMEOUT_SECS: usize = 600;
 pub const MAX_OUTPUT_BYTES: usize = 50_000;
+pub const MAX_OUTPUT_LINES: usize = 2_000;
+/// After the main process exits, read leftover output for at most this long.
+const DRAIN_MILLIS: u64 = 200;
 
 pub async fn run(args: &Value, cwd: &Path) -> ToolOutput {
     let command = match arg_str(args, "command") {
@@ -18,20 +29,30 @@ pub async fn run(args: &Value, cwd: &Path) -> ToolOutput {
         Err(err) => return ToolOutput::error(err),
     };
     let timeout_secs = match arg_usize(args, "timeout_secs", DEFAULT_TIMEOUT_SECS) {
-        Ok(secs) => secs.max(1),
+        Ok(secs) => secs.clamp(1, MAX_TIMEOUT_SECS),
         Err(err) => return ToolOutput::error(err),
     };
 
-    // `kill_on_drop` kills the child when the timeout drops the future.
-    let child = match Command::new("sh")
-        .arg("-c")
+    let mut cmd = Command::new("sh");
+    cmd.arg("-c")
         .arg(&command)
         .current_dir(cwd)
+        // /dev/null stdin: a command that waits for input fails at once
+        // instead of hanging until the timeout.
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .kill_on_drop(true)
-        .spawn()
-    {
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("PAGER", "cat")
+        .env("GIT_PAGER", "cat")
+        .env("TERM", "dumb")
+        .env("NO_COLOR", "1")
+        .env("CI", "1")
+        .kill_on_drop(true);
+    #[cfg(unix)]
+    cmd.process_group(0);
+
+    let mut child = match cmd.spawn() {
         Ok(child) => child,
         Err(err) => {
             return ToolOutput::error(format!(
@@ -41,31 +62,48 @@ pub async fn run(args: &Value, cwd: &Path) -> ToolOutput {
         }
     };
 
-    let waited = tokio::time::timeout(
-        Duration::from_secs(timeout_secs as u64),
-        child.wait_with_output(),
-    )
-    .await;
+    let mut group = GroupGuard::new(child.id());
+    let out_buf = Arc::new(Mutex::new(Vec::new()));
+    let err_buf = Arc::new(Mutex::new(Vec::new()));
+    let mut out_task = tokio::spawn(pump(child.stdout.take(), out_buf.clone()));
+    let mut err_task = tokio::spawn(pump(child.stderr.take(), err_buf.clone()));
 
-    let output = match waited {
-        Ok(Ok(output)) => output,
-        Ok(Err(err)) => return ToolOutput::error(format!("could not run command: {err}")),
+    let waited = tokio::time::timeout(Duration::from_secs(timeout_secs as u64), child.wait()).await;
+
+    let status = match waited {
+        Ok(Ok(status)) => status,
+        Ok(Err(err)) => {
+            group.kill();
+            return ToolOutput::error(format!("could not run command: {err}"));
+        }
         Err(_) => {
+            group.kill();
+            // Reap the shell, but never wait forever if the kill failed.
+            let _ = tokio::time::timeout(Duration::from_secs(2), child.wait()).await;
+            out_task.abort();
+            err_task.abort();
             return ToolOutput::error(format!(
                 "command timed out after {timeout_secs} seconds and was killed"
-            ))
+            ));
         }
     };
 
-    let mut combined = String::from_utf8_lossy(&output.stdout).into_owned();
-    combined.push_str(&String::from_utf8_lossy(&output.stderr));
+    // A background child can keep the pipes open. Give the pumps a short
+    // window, then stop reading and kill the whole group.
+    if !drain(&mut out_task, &mut err_task).await {
+        group.kill();
+        out_task.abort();
+        err_task.abort();
+    }
+    group.disarm();
 
+    let combined = collect(&out_buf, &err_buf);
     let mut text = tail(&combined);
     if !text.is_empty() && !text.ends_with('\n') {
         text.push('\n');
     }
 
-    match output.status.code() {
+    match status.code() {
         Some(code) => {
             text.push_str(&format!("exit code: {code}"));
             if code == 0 {
@@ -81,57 +119,154 @@ pub async fn run(args: &Value, cwd: &Path) -> ToolOutput {
     }
 }
 
-/// Keep the last `MAX_OUTPUT_BYTES`, on a char boundary, with a marker.
+/// Read a pipe to the end into a shared buffer.
+async fn pump<R>(reader: Option<R>, buf: Arc<Mutex<Vec<u8>>>)
+where
+    R: tokio::io::AsyncRead + Unpin,
+{
+    let Some(mut reader) = reader else {
+        return;
+    };
+    let mut chunk = [0u8; 8192];
+    loop {
+        match reader.read(&mut chunk).await {
+            Ok(0) | Err(_) => break,
+            Ok(n) => buffer(&buf).extend_from_slice(&chunk[..n]),
+        }
+    }
+}
+
+/// Wait at most `DRAIN_MILLIS` for both pumps. False means they are still open.
+async fn drain(out_task: &mut JoinHandle<()>, err_task: &mut JoinHandle<()>) -> bool {
+    let deadline = Instant::now() + Duration::from_millis(DRAIN_MILLIS);
+    while !(out_task.is_finished() && err_task.is_finished()) {
+        if Instant::now() >= deadline {
+            return false;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    true
+}
+
+fn buffer(buf: &Arc<Mutex<Vec<u8>>>) -> std::sync::MutexGuard<'_, Vec<u8>> {
+    buf.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn collect(out_buf: &Arc<Mutex<Vec<u8>>>, err_buf: &Arc<Mutex<Vec<u8>>>) -> String {
+    let mut bytes = buffer(out_buf).clone();
+    bytes.extend_from_slice(&buffer(err_buf));
+    strip_ansi(&String::from_utf8_lossy(&bytes))
+}
+
+/// Remove ANSI escape sequences with a small state machine (no regex crate).
+fn strip_ansi(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c != '\x1b' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            // CSI: ESC [ ... one final byte 0x40..=0x7e
+            Some('[') => {
+                for n in chars.by_ref() {
+                    if ('\x40'..='\x7e').contains(&n) {
+                        break;
+                    }
+                }
+            }
+            // OSC: ESC ] ... BEL or ESC \
+            Some(']') => loop {
+                match chars.next() {
+                    None | Some('\x07') => break,
+                    Some('\x1b') => {
+                        if chars.peek() == Some(&'\\') {
+                            chars.next();
+                        }
+                        break;
+                    }
+                    Some(_) => {}
+                }
+            },
+            // Any other two-byte escape: drop both bytes.
+            Some(_) | None => {}
+        }
+    }
+    out
+}
+
+/// Keep the last `MAX_OUTPUT_BYTES` bytes and the last `MAX_OUTPUT_LINES` lines.
 fn tail(text: &str) -> String {
-    if text.len() <= MAX_OUTPUT_BYTES {
-        return text.to_string();
+    let lines: Vec<&str> = text.lines().collect();
+    let mut cut = false;
+    let mut body = if lines.len() > MAX_OUTPUT_LINES {
+        cut = true;
+        lines[lines.len() - MAX_OUTPUT_LINES..].join("\n")
+    } else {
+        text.to_string()
+    };
+    if body.len() > MAX_OUTPUT_BYTES {
+        body = truncate_from_end(&body, MAX_OUTPUT_BYTES).to_string();
+        cut = true;
     }
-    let mut start = text.len() - MAX_OUTPUT_BYTES;
-    while start < text.len() && !text.is_char_boundary(start) {
-        start += 1;
+    if cut {
+        format!("[output truncated]\n{body}")
+    } else {
+        body
     }
-    format!("[output truncated]\n{}", &text[start..])
+}
+
+#[cfg(unix)]
+struct GroupGuard {
+    pid: Option<u32>,
+}
+
+#[cfg(unix)]
+impl GroupGuard {
+    fn new(pid: Option<u32>) -> Self {
+        Self { pid }
+    }
+
+    fn disarm(&mut self) {
+        self.pid = None;
+    }
+
+    /// `kill -KILL -<pid>` kills the whole process group, not just the shell.
+    fn kill(&mut self) {
+        if let Some(pid) = self.pid.take() {
+            let target = format!("-{pid}");
+            let _ = std::process::Command::new("kill")
+                .arg("-KILL")
+                .arg(&target)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+        }
+    }
+}
+
+#[cfg(unix)]
+impl Drop for GroupGuard {
+    fn drop(&mut self) {
+        self.kill();
+    }
+}
+
+#[cfg(not(unix))]
+struct GroupGuard;
+
+#[cfg(not(unix))]
+impl GroupGuard {
+    fn new(_pid: Option<u32>) -> Self {
+        Self
+    }
+
+    fn disarm(&mut self) {}
+
+    fn kill(&mut self) {}
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    fn cwd() -> std::path::PathBuf {
-        std::env::temp_dir()
-    }
-
-    #[tokio::test]
-    async fn echo_hi_exits_zero() {
-        let out = run(&json!({"command": "echo hi"}), &cwd()).await;
-        assert!(!out.is_error, "{}", out.text);
-        assert!(out.text.contains("hi"), "{}", out.text);
-        assert!(out.text.contains("exit code: 0"), "{}", out.text);
-    }
-
-    #[tokio::test]
-    async fn exit_three_is_error() {
-        let out = run(&json!({"command": "exit 3"}), &cwd()).await;
-        assert!(out.is_error);
-        assert!(out.text.contains("exit code: 3"), "{}", out.text);
-    }
-
-    #[tokio::test]
-    async fn timeout_kills_the_process() {
-        let started = std::time::Instant::now();
-        let out = run(&json!({"command": "sleep 5", "timeout_secs": 1}), &cwd()).await;
-        assert!(out.is_error);
-        assert!(out.text.contains("timed out"), "{}", out.text);
-        assert!(started.elapsed() < Duration::from_secs(4));
-    }
-
-    #[test]
-    fn tail_keeps_end() {
-        let text = format!("start\n{}end", "x".repeat(MAX_OUTPUT_BYTES));
-        let out = tail(&text);
-        assert!(out.starts_with("[output truncated]"));
-        assert!(out.ends_with("end"));
-        assert!(out.len() <= MAX_OUTPUT_BYTES + 30);
-    }
-}
+#[path = "bash_tests.rs"]
+mod tests;

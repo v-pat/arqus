@@ -1,0 +1,5 @@
+Run python3 app.py. It crashes with a traceback. Fix the crash so the program prints exactly:
+
+result: 5
+
+Do not change the print statement or the call in main().

@@ -24,6 +24,8 @@ pub struct Usage {
     pub output: u64,
     pub cache_read: u64,
     pub cache_write: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
 }
 
 impl Usage {
@@ -90,6 +92,9 @@ pub enum EntryKind {
         tokens_before: u64,
         read_files: Vec<String>,
         modified_files: Vec<String>,
+        /// Usage of the summary call, so summaries count in the totals.
+        #[serde(default)]
+        summary_usage: Option<Usage>,
     },
     BranchSummary {
         summary: String,
@@ -159,6 +164,7 @@ mod tests {
                 output: 40,
                 cache_read: 0,
                 cache_write: 0,
+                cost: Some(0.0012),
             }),
             stop: StopReason::ToolUse,
         };
@@ -218,6 +224,13 @@ mod tests {
                 tokens_before: 185_000,
                 read_files: vec!["src/a.rs".to_string()],
                 modified_files: vec![],
+                summary_usage: Some(Usage {
+                    input: 100,
+                    output: 20,
+                    cache_read: 0,
+                    cache_write: 0,
+                    cost: Some(0.0001),
+                }),
             },
         );
         assert_eq!(value.clone(), roundtrip(value));
@@ -260,5 +273,30 @@ mod tests {
         println!("user entry JSON: {line}");
         assert!(line.contains("\"type\":\"message\""));
         assert!(line.contains("\"role\":\"user\""));
+    }
+
+    /// Stage 16 added `cost` and `summary_usage`. Old files must still load.
+    #[test]
+    fn old_entries_without_new_cost_fields_parse() {
+        let usage: Usage =
+            serde_json::from_str(r#"{"input":1,"output":2,"cache_read":3,"cache_write":4}"#)
+                .expect("old usage");
+        assert_eq!(usage.cost, None);
+
+        let entry: Entry = serde_json::from_str(
+            r#"{"id":"e1","parent_id":null,"ts":0,"type":"compaction","summary":"s",
+                "first_kept_id":"e2","tokens_before":9,"read_files":[],"modified_files":[]}"#,
+        )
+        .expect("old compaction");
+        match entry.kind {
+            EntryKind::Compaction { summary_usage, .. } => assert!(summary_usage.is_none()),
+            other => panic!("expected compaction, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unknown_cost_is_not_written_to_the_file() {
+        let text = serde_json::to_string(&Usage::default()).expect("serialize");
+        assert!(!text.contains("cost"), "unexpected cost field in {text}");
     }
 }

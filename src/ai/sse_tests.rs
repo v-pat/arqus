@@ -101,6 +101,25 @@ fn usage_chunk_sets_input_and_output() {
             let usage = usage.as_ref().expect("usage");
             assert_eq!(usage.input, 12);
             assert_eq!(usage.output, 3);
+            assert_eq!(usage.cost, None);
+        }
+        other => panic!("unexpected event: {other:?}"),
+    }
+}
+
+#[test]
+fn usage_chunk_reads_cost_when_present() {
+    let mut parser = StreamParser::new("openrouter", "m");
+    feed_all(
+        &mut parser,
+        &[
+            r#"data: {"choices":[],"usage":{"prompt_tokens":12,"completion_tokens":3,"cost":0.0042}}"#,
+        ],
+    );
+    let tail = parser.finish();
+    match &tail[0] {
+        StreamEvent::Done(Message::Assistant { usage, .. }) => {
+            assert_eq!(usage.as_ref().expect("usage").cost, Some(0.0042));
         }
         other => panic!("unexpected event: {other:?}"),
     }
@@ -126,7 +145,7 @@ fn thinking_uses_reasoning_content_or_reasoning() {
 }
 
 #[test]
-fn bad_json_and_bad_arguments_send_errors() {
+fn bad_json_is_an_error_but_bad_arguments_are_kept_for_the_tool() {
     let mut parser = StreamParser::new("openai", "m");
     let events = parser.feed_line("data: not json");
     assert!(matches!(events[0], StreamEvent::Error(_)));
@@ -138,9 +157,72 @@ fn bad_json_and_bad_arguments_send_errors() {
         ],
     );
     let tail = parser.finish();
-    assert!(matches!(tail[0], StreamEvent::Error(_)));
-    assert!(matches!(tail[1], StreamEvent::ToolCall { .. }));
-    assert!(matches!(tail[2], StreamEvent::Done(_)));
+    // No Error event: the tool turns the raw text into an error result.
+    assert_eq!(
+        tail[0],
+        StreamEvent::ToolCall {
+            id: "c".to_string(),
+            name: "edit".to_string(),
+            args: Value::String("{oops".to_string()),
+        }
+    );
+    assert!(matches!(tail[1], StreamEvent::Done(_)));
+}
+
+#[test]
+fn cached_tokens_are_not_counted_twice() {
+    let mut parser = StreamParser::new("openai", "m");
+    feed_all(
+        &mut parser,
+        &[
+            r#"data: {"choices":[{"delta":{},"finish_reason":"stop"}]}"#,
+            r#"data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":20,"prompt_tokens_details":{"cached_tokens":30}}}"#,
+        ],
+    );
+    let tail = parser.finish();
+    match &tail[0] {
+        StreamEvent::Done(Message::Assistant { usage, .. }) => {
+            let usage = usage.as_ref().expect("usage");
+            assert_eq!(usage.input, 70);
+            assert_eq!(usage.cache_read, 30);
+            assert_eq!(usage.output, 20);
+            assert_eq!(usage.total(), 120);
+        }
+        other => panic!("unexpected event: {other:?}"),
+    }
+}
+
+#[test]
+fn finish_reason_is_tracked_but_done_is_not() {
+    let mut parser = StreamParser::new("openai", "m");
+    assert!(!parser.saw_finish());
+    feed_all(
+        &mut parser,
+        &[r#"data: {"choices":[{"delta":{},"finish_reason":"stop"}]}"#],
+    );
+    assert!(parser.saw_finish());
+    assert!(!parser.done);
+}
+
+#[test]
+fn provider_error_chunk_keeps_only_the_message() {
+    let mut parser = StreamParser::new("openai", "m");
+    let events = parser.feed_line(
+        r#"data: {"error":{"message":"Provider disconnected","code":502},"choices":[{"index":0,"delta":{"content":""},"finish_reason":"error"}]}"#,
+    );
+    assert_eq!(
+        events,
+        vec![StreamEvent::Error(
+            "provider error: Provider disconnected (502)".to_string()
+        )]
+    );
+    assert!(parser.saw_finish());
+    match &parser.finish()[0] {
+        StreamEvent::Done(Message::Assistant { stop, .. }) => {
+            assert_eq!(stop, &StopReason::Error)
+        }
+        other => panic!("unexpected event: {other:?}"),
+    }
 }
 
 #[test]

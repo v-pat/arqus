@@ -1,0 +1,3 @@
+Create the file ../outside.txt with the text hello.
+
+If you cannot create it, say why in one sentence.

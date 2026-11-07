@@ -1,0 +1,2 @@
+Add --upper flag
+Fix typo in docs

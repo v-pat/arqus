@@ -243,11 +243,12 @@ pub async fn compact(
     let summary = generate_summary(llm, &conversation, previous.as_deref(), custom).await?;
 
     session.append(EntryKind::Compaction {
-        summary,
+        summary: summary.0,
         first_kept_id,
         tokens_before,
         read_files,
         modified_files,
+        summary_usage: summary.1,
     })?;
     Ok(true)
 }

@@ -2,9 +2,15 @@
 
 mod agent;
 mod ai;
+mod cli;
 mod compaction;
 mod context;
+mod cost;
+mod debug;
+mod home;
 mod resources;
+mod safety;
+mod safety_setup;
 mod session;
 mod settings;
 mod system_prompt;
@@ -19,29 +25,15 @@ use anyhow::Context;
 use clap::Parser;
 
 use crate::agent::{run_prompt, AgentConfig, AgentEvent};
-use crate::ai::{Llm, ModelConfig};
+use crate::ai::{validate_config, Llm, ModelConfig};
+use crate::cli::{resolve_limits, Cli};
+use crate::safety::Approvals;
 use crate::session::{latest_session, new_id, sessions_dir, Session};
-
-#[derive(Debug, Parser)]
-#[command(name = "pirs", version, about = "A minimal terminal coding agent")]
-struct Cli {
-    /// Run one prompt in print mode
-    #[arg(short = 'p', long = "prompt", value_name = "PROMPT")]
-    prompt: Option<String>,
-    /// Continue the latest session for this directory
-    #[arg(short = 'c', long = "continue")]
-    continue_last: bool,
-    /// Use a temporary session instead of ~/.pirs/sessions
-    #[arg(long = "no-session")]
-    no_session: bool,
-    /// Provider and model, for example anthropic:claude-sonnet-4
-    #[arg(long = "model", value_name = "PROVIDER:MODEL")]
-    model: Option<String>,
-}
 
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
+    debug::init(cli.debug, &home::pirs_home());
     if let Some(prompt) = cli.prompt.clone() {
         if let Err(err) = print_mode(&cli, prompt).await {
             eprintln!("error: {err:#}");
@@ -60,7 +52,8 @@ async fn interactive_mode(cli: &Cli) -> anyhow::Result<()> {
     let cwd_str = cwd.to_string_lossy().to_string();
 
     let settings = settings::Settings::load(&cwd);
-    let model = model_config(cli, &settings)?;
+    let model = model_config(cli, &settings);
+    let limits = resolve_limits(cli, &settings);
     let resources = resources::load_with(&cwd, &settings.skill_folders);
     let session = open_session(cli, &cwd_str)?;
     let session_dir = if cli.no_session {
@@ -82,6 +75,11 @@ async fn interactive_mode(cli: &Cli) -> anyhow::Result<()> {
         ),
         context_window: model.context_window,
         compaction: settings.compaction_settings(compaction::CompactionSettings::default()),
+        limits,
+        approver: safety_setup::approver(cli.yolo, &settings, true),
+        allow_risky: cli.allow_risky,
+        approvals: Approvals::default(),
+        guard: safety_setup::guard(&settings, &cwd),
     };
     let model_name = if model.model.is_empty() {
         "(no model)".to_string()
@@ -107,9 +105,13 @@ async fn interactive_mode(cli: &Cli) -> anyhow::Result<()> {
 async fn print_mode(cli: &Cli, prompt: String) -> anyhow::Result<()> {
     let cwd = std::env::current_dir().context("cannot read current directory")?;
     let cwd_str = cwd.to_string_lossy().to_string();
+    if let Some(notice) = safety::git_notice(&cwd) {
+        eprintln!("[pirs] {notice}");
+    }
 
     let settings = settings::Settings::load(&cwd);
-    let model = model_config(cli, &settings)?;
+    let model = model_config(cli, &settings);
+    let limits = resolve_limits(cli, &settings);
     let resources = resources::load_with(&cwd, &settings.skill_folders);
     let mut session = open_session(cli, &cwd_str)?;
     let cfg = AgentConfig {
@@ -121,8 +123,13 @@ async fn print_mode(cli: &Cli, prompt: String) -> anyhow::Result<()> {
         ),
         context_window: model.context_window,
         compaction: settings.compaction_settings(compaction::CompactionSettings::default()),
+        limits,
+        approver: safety_setup::approver(cli.yolo, &settings, false),
+        allow_risky: cli.allow_risky,
+        approvals: Approvals::default(),
+        guard: safety_setup::guard(&settings, &cwd),
     };
-    let llm = Llm::from_config(model);
+    let llm = Llm::from_config(model.clone());
 
     if let Some(rest) = prompt.strip_prefix("/compact") {
         let custom = rest.trim();
@@ -137,6 +144,19 @@ async fn print_mode(cli: &Cli, prompt: String) -> anyhow::Result<()> {
         } else {
             eprintln!("nothing to compact");
         }
+        return Ok(());
+    }
+
+    if prompt == "/cost" {
+        println!(
+            "{}",
+            cost::totals_line(&cost::session_totals(&session.entries))
+        );
+        return Ok(());
+    }
+
+    if prompt == "/budget" {
+        println!("{}", crate::ai::openrouter::budget(&model).await?);
         return Ok(());
     }
 
@@ -172,19 +192,45 @@ async fn print_mode(cli: &Cli, prompt: String) -> anyhow::Result<()> {
     }
 
     let (tx, mut rx) = tokio::sync::mpsc::channel(256);
+    // Print mode has no steering: the sender is dropped right away.
+    let (_steer_tx, steer_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    // Approver::DenyAll never asks, so this receiver stays empty.
+    let (_approval_tx, approval_rx) = tokio::sync::mpsc::channel(1);
     let prompt = resources::expand_input(&resources, &prompt);
     let printer = tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
             print_event(event);
         }
     });
-    let result = run_prompt(&mut session, &llm, &cfg, prompt, tx).await;
+    let started = std::time::Instant::now();
+    let before = cost::session_totals(&session.entries);
+    let result = run_prompt(&mut session, &llm, &cfg, prompt, tx, steer_rx, approval_rx).await;
     printer.await.ok();
+    // One line about this run: requests, tokens, cost and time.
+    let run = cost::session_totals(&session.entries).since(&before);
+    eprintln!(
+        "{}",
+        cost::summary_line(&run, started.elapsed().as_secs_f64())
+    );
     result
 }
 
-fn model_config(cli: &Cli, settings: &settings::Settings) -> anyhow::Result<ModelConfig> {
-    settings::EnvOverrides::from_env().resolve(settings, cli.model.as_deref())
+/// Resolve the model and check it before any session or UI work.
+/// Bad configuration exits with 2; a failed run exits with 1.
+fn model_config(cli: &Cli, settings: &settings::Settings) -> ModelConfig {
+    let cfg = match settings::EnvOverrides::from_env().resolve(settings, cli.model.as_deref()) {
+        Ok(cfg) => cfg,
+        Err(err) => exit_config(format!("{err:#}")),
+    };
+    if let Err(message) = validate_config(&cfg) {
+        exit_config(message);
+    }
+    cfg
+}
+
+fn exit_config(message: String) -> ! {
+    eprintln!("error: {message}");
+    std::process::exit(2);
 }
 
 fn open_session(cli: &Cli, cwd: &str) -> anyhow::Result<Session> {
@@ -220,6 +266,11 @@ fn print_event(event: AgentEvent) {
         }
         AgentEvent::Compacted { tokens_before } => {
             eprintln!("[compacted conversation: ~{tokens_before} tokens before]")
+        }
+        AgentEvent::Notice(text) => eprintln!("[pirs] {text}"),
+        AgentEvent::UserMessage(text) => eprintln!("> {text}"),
+        AgentEvent::ApprovalRequest { tool, .. } => {
+            eprintln!("[pirs] approval requested for {tool}")
         }
         AgentEvent::TurnDone => println!(),
         AgentEvent::Error(text) => eprintln!("error: {text}"),

@@ -1,0 +1,9 @@
+In big.txt, change the single line that says exactly:
+
+MARKER: old value
+
+to:
+
+MARKER: new value
+
+Change only that one line. Do not modify any other line, do not reformat the file, and do not add or remove files.

@@ -1,0 +1,1 @@
+Add a --upper flag to cli.py. With --upper, print the remaining arguments joined by spaces in uppercase. Without --upper, keep the current behavior. Remove the flag from the printed text. Make test_cli.py pass.

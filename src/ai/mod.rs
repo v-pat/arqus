@@ -7,12 +7,18 @@ pub mod sse;
 use std::collections::VecDeque;
 use std::fmt;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::mpsc::Sender;
 
 use crate::types::Message;
+
+mod error;
+pub use error::{
+    classify_http, friendly_error, retry_delay, validate_config, LlmError, RetrySettings,
+};
 
 /// One tool the model may call. `parameters` is a JSON schema.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -135,6 +141,8 @@ pub enum StreamEvent {
     },
     Done(Message),
     Error(String),
+    /// Progress line, for example before a retry. Not part of the answer.
+    Notice(String),
 }
 
 /// The provider set. Add a variant instead of a trait object.
@@ -162,21 +170,115 @@ impl Llm {
         }
     }
 
-    /// Stream one model call into `tx`.
+    async fn stream_once(
+        &self,
+        req: LlmRequest,
+        tx: Sender<StreamEvent>,
+    ) -> std::result::Result<(), LlmError> {
+        match self {
+            Llm::OpenAi(cfg) => openai::stream(cfg, req, tx).await,
+            Llm::OpenRouter(cfg) => openrouter::stream(cfg, req, tx).await,
+            Llm::Anthropic(cfg) => anthropic::stream(cfg, req, tx).await,
+            Llm::Mock(queue) => mock::stream(queue.clone(), req, tx)
+                .await
+                .map_err(|err| LlmError::Other(format!("{err:#}"))),
+            Llm::MockCapture(queue, seen) => {
+                mock::stream_capture(queue.clone(), seen.clone(), req, tx)
+                    .await
+                    .map_err(|err| LlmError::Other(format!("{err:#}")))
+            }
+        }
+    }
+
+    /// Stream one model call into `tx`, retrying only when the attempt
+    /// delivered no content yet. A retry after output could repeat a tool
+    /// call, so a failure with partial output ends the request instead.
     ///
     /// Rust note: `Arc<Mutex<T>>` shares one value between many owners.
     /// `Arc` makes the clone cheap and keeps it alive; `Mutex` makes the
     /// mutation safe. The mock queue needs both, because tests reuse it.
     pub async fn stream(&self, req: LlmRequest, tx: Sender<StreamEvent>) -> anyhow::Result<()> {
-        match self {
-            Llm::OpenAi(cfg) => openai::stream(cfg, req, tx).await,
-            Llm::OpenRouter(cfg) => openrouter::stream(cfg, req, tx).await,
-            Llm::Anthropic(cfg) => anthropic::stream(cfg, req, tx).await,
-            Llm::Mock(queue) => mock::stream(queue.clone(), req, tx).await,
-            Llm::MockCapture(queue, seen) => {
-                mock::stream_capture(queue.clone(), seen.clone(), req, tx).await
+        let settings = RetrySettings::from_env();
+        let mut attempt: u32 = 0;
+        loop {
+            let (inner_tx, mut inner_rx) = tokio::sync::mpsc::channel(64);
+            // The thread that owns the parser runs as its own future, so a
+            // half-finished attempt can be dropped cleanly.
+            let run = self.stream_once(req.clone(), inner_tx);
+            tokio::pin!(run);
+            let mut outcome: Option<std::result::Result<(), LlmError>> = None;
+            let mut delivered = false;
+
+            loop {
+                tokio::select! {
+                    result = &mut run, if outcome.is_none() => {
+                        outcome = Some(result);
+                    }
+                    event = inner_rx.recv() => match event {
+                        Some(event) => {
+                            if is_content(&event) {
+                                delivered = true;
+                            }
+                            if tx.send(event).await.is_err() {
+                                return Ok(());
+                            }
+                        }
+                        // The producer future dropped its sender, so it has
+                        // returned. Its result is read below, outside the loop.
+                        None => break,
+                    },
+                }
             }
+            if outcome.is_none() {
+                outcome = Some(run.as_mut().await);
+            }
+
+            let error = match outcome.unwrap_or(Ok(())) {
+                Ok(()) => return Ok(()),
+                Err(error) => error,
+            };
+            if delivered {
+                return Err(anyhow::Error::new(error));
+            }
+            let delay = if attempt < settings.max_retries {
+                retry_delay(&error, attempt, settings.base_ms)
+            } else {
+                None
+            };
+            let Some(delay) = delay else {
+                return Err(anyhow::Error::new(error));
+            };
+            attempt += 1;
+            let notice = format!(
+                "{}, retrying in {} (attempt {}/{})",
+                error.label(),
+                wait_text(delay),
+                attempt,
+                settings.max_retries
+            );
+            crate::debug::log("retry", serde_json::json!({"notice": notice}));
+            if tx.send(StreamEvent::Notice(notice)).await.is_err() {
+                return Ok(());
+            }
+            tokio::time::sleep(delay).await;
         }
+    }
+}
+
+/// Text or a tool call means the model already produced something.
+fn is_content(event: &StreamEvent) -> bool {
+    match event {
+        StreamEvent::TextDelta(text) | StreamEvent::ThinkingDelta(text) => !text.is_empty(),
+        StreamEvent::ToolCall { .. } => true,
+        _ => false,
+    }
+}
+
+fn wait_text(delay: Duration) -> String {
+    if delay.as_secs() >= 1 {
+        format!("{}s", delay.as_secs())
+    } else {
+        format!("{}ms", delay.as_millis())
     }
 }
 

@@ -24,8 +24,19 @@ impl Runtime {
         session: &mut Session,
         text: String,
         events: Sender<AgentEvent>,
+        steer_rx: tokio::sync::mpsc::UnboundedReceiver<String>,
+        approval_rx: tokio::sync::mpsc::Receiver<crate::safety::Decision>,
     ) -> Result<()> {
-        run_prompt(session, &self.llm, &self.cfg, text, events).await
+        run_prompt(
+            session,
+            &self.llm,
+            &self.cfg,
+            text,
+            events,
+            steer_rx,
+            approval_rx,
+        )
+        .await
     }
 
     pub async fn compact(&self, session: &mut Session, focus: Option<String>) -> Result<bool> {
@@ -54,5 +65,13 @@ impl Runtime {
     pub fn context_tokens(&self, session: &Session) -> u64 {
         let messages = build_context(&session.entries, session.leaf_id.as_deref());
         crate::compaction::context_tokens(&messages)
+    }
+
+    /// Money left on the OpenRouter key, as one line.
+    pub async fn budget(&self) -> Result<String> {
+        match &self.llm {
+            Llm::OpenRouter(cfg) => crate::ai::openrouter::budget(cfg).await,
+            _ => Ok("budget: only available for the openrouter provider".to_string()),
+        }
     }
 }

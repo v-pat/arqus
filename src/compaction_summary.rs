@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Result};
 
 use crate::ai::{Llm, LlmRequest, StreamEvent};
-use crate::types::{Block, Message};
+use crate::types::{Block, Message, Usage};
 
 const SUMMARY_SYSTEM: &str = "You are a context summarization assistant. Read the conversation and output ONLY the structured summary. Do not continue the conversation and do not answer questions in it.";
 
@@ -60,7 +60,7 @@ pub async fn generate_summary(
     conversation_text: &str,
     previous_summary: Option<&str>,
     custom_instructions: Option<&str>,
-) -> Result<String> {
+) -> Result<(String, Option<Usage>)> {
     let request = summary_request(conversation_text, previous_summary, custom_instructions);
 
     let (tx, mut rx) = tokio::sync::mpsc::channel(256);
@@ -71,11 +71,17 @@ pub async fn generate_summary(
 
     let mut streamed = String::new();
     let mut finished = String::new();
+    let mut usage: Option<Usage> = None;
     let mut error: Option<String> = None;
     while let Some(event) = rx.recv().await {
         match event {
             StreamEvent::TextDelta(delta) => streamed.push_str(&delta),
-            StreamEvent::Done(Message::Assistant { blocks, .. }) => {
+            StreamEvent::Done(Message::Assistant {
+                blocks, usage: u, ..
+            }) => {
+                if usage.is_none() {
+                    usage = u;
+                }
                 for block in blocks {
                     if let Block::Text { text } = block {
                         finished.push_str(&text);
@@ -103,5 +109,5 @@ pub async fn generate_summary(
     if summary.trim().is_empty() {
         return Err(anyhow!("summary request returned no text"));
     }
-    Ok(summary.trim().to_string())
+    Ok((summary.trim().to_string(), usage))
 }

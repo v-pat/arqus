@@ -1,0 +1,1 @@
+Rename the function calc_total to compute_total in every Python file in this project. Keep the behavior identical. Make test_all.py pass.

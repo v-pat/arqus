@@ -142,6 +142,7 @@ fn extract_file_ops_merges_and_sorts() {
                 tokens_before: 0,
                 read_files: vec!["old.rs".to_string(), "b.rs".to_string()],
                 modified_files: vec!["b.rs".to_string()],
+                summary_usage: None,
             },
         },
         Entry {
@@ -285,12 +286,30 @@ async fn agent_compacts_after_a_long_turn() {
         system_prompt: "test".to_string(),
         context_window: 100,
         compaction: settings(),
+        limits: crate::cost::Limits::default(),
+        approver: crate::safety::Approver::Auto,
+        allow_risky: false,
+        approvals: crate::safety::Approvals::default(),
+        guard: crate::safety::Guard {
+            cwd: dir.clone(),
+            allow_paths: Vec::new(),
+            pirs_home: dir.join(".pirs-home"),
+            user_home: None,
+        },
     };
     let (tx, rx) = tokio::sync::mpsc::channel(8);
     drop(rx);
-    run_prompt(&mut session, &llm, &cfg, "go".to_string(), tx)
-        .await
-        .unwrap();
+    run_prompt(
+        &mut session,
+        &llm,
+        &cfg,
+        "go".to_string(),
+        tx,
+        tokio::sync::mpsc::unbounded_channel().1,
+        tokio::sync::mpsc::channel(1).1,
+    )
+    .await
+    .unwrap();
 
     match session.entries.last().map(|e| &e.kind) {
         Some(EntryKind::Compaction { summary, .. }) => assert_eq!(summary, "AUTO SUMMARY"),

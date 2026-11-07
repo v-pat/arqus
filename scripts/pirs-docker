@@ -1,0 +1,17 @@
+#!/bin/sh
+# Run pirs inside a container that sees only the current folder.
+# Usage: pirs-docker [pirs arguments]    (cd into the project first)
+set -eu
+IMAGE="${PIRS_IMAGE:-pirs:dev}"
+: "${PIRS_API_KEY:?set PIRS_API_KEY first}"
+STATE="${PIRS_DOCKER_STATE:-$HOME/.pirs-docker}"
+mkdir -p "$STATE"
+if [ -t 0 ] && [ -t 1 ]; then TTY="-it"; else TTY="-i"; fi
+exec docker run --rm $TTY \
+  --cap-drop=ALL --security-opt no-new-privileges \
+  --memory="${PIRS_DOCKER_MEMORY:-4g}" --cpus="${PIRS_DOCKER_CPUS:-4}" --pids-limit=512 \
+  -e PIRS_API_KEY -e PIRS_MODEL -e PIRS_PROVIDER -e PIRS_BASE_URL -e PIRS_CONTEXT_WINDOW \
+  -v "$PWD":/work \
+  -v "$STATE":/home/agent/.pirs \
+  -w /work \
+  "$IMAGE" "$@"
