@@ -79,7 +79,7 @@ impl Recorded {
 }
 
 pub struct FakeLlm {
-    /// Use as PIRS_BASE_URL, for example http://127.0.0.1:41233/v1
+    /// Use as ARQUS_BASE_URL, for example http://127.0.0.1:41233/v1
     pub url: String,
     recorded: Arc<Mutex<Vec<Recorded>>>,
 }
@@ -87,6 +87,17 @@ pub struct FakeLlm {
 impl FakeLlm {
     pub fn start(replies: Vec<Reply>) -> FakeLlm {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        FakeLlm::serve(listener, replies)
+    }
+
+    /// Bind one explicit port. Used by `examples/fake_llm.rs`, which prints the
+    /// port so a shell script can point `ARQUS_BASE_URL` at it.
+    pub fn start_on(port: u16, replies: Vec<Reply>) -> std::io::Result<FakeLlm> {
+        let listener = TcpListener::bind(("127.0.0.1", port))?;
+        Ok(FakeLlm::serve(listener, replies))
+    }
+
+    fn serve(listener: TcpListener, replies: Vec<Reply>) -> FakeLlm {
         let port = listener.local_addr().unwrap().port();
         let recorded = Arc::new(Mutex::new(Vec::new()));
         let queue = Arc::new(Mutex::new(VecDeque::from(replies)));
@@ -321,7 +332,7 @@ impl TempDir {
             .unwrap()
             .as_nanos();
         let path =
-            std::env::temp_dir().join(format!("pirs_test_{label}_{}_{n}_{t}", std::process::id()));
+            std::env::temp_dir().join(format!("arqus_test_{label}_{}_{n}_{t}", std::process::id()));
         std::fs::create_dir_all(&path).unwrap();
         TempDir { path }
     }
@@ -333,31 +344,31 @@ impl Drop for TempDir {
     }
 }
 
-/// Run the real compiled `pirs` binary against the fake server.
-/// `cwd` is the project folder, `home` becomes PIRS_HOME. Any PIRS_* variables of your own shell are removed first.
+/// Run the real compiled `arqus` binary against the fake server.
+/// `cwd` is the project folder, `home` becomes ARQUS_HOME. Any ARQUS_* variables of your own shell are removed first.
 /// Adds `--yolo`, so tools run without approval like before stage 22.
-pub fn run_pirs(
+pub fn run_arqus(
     cwd: &Path,
     home: &Path,
     base_url: &str,
     args: &[&str],
     extra_env: &[(&str, &str)],
 ) -> Output {
-    run_pirs_extra(cwd, home, base_url, args, extra_env, true)
+    run_arqus_extra(cwd, home, base_url, args, extra_env, true)
 }
 
-/// Same as `run_pirs` but keeps the default approval mode (`ask`).
-pub fn run_pirs_without_yolo(
+/// Same as `run_arqus` but keeps the default approval mode (`ask`).
+pub fn run_arqus_without_yolo(
     cwd: &Path,
     home: &Path,
     base_url: &str,
     args: &[&str],
     extra_env: &[(&str, &str)],
 ) -> Output {
-    run_pirs_extra(cwd, home, base_url, args, extra_env, false)
+    run_arqus_extra(cwd, home, base_url, args, extra_env, false)
 }
 
-fn run_pirs_extra(
+fn run_arqus_extra(
     cwd: &Path,
     home: &Path,
     base_url: &str,
@@ -365,31 +376,34 @@ fn run_pirs_extra(
     extra_env: &[(&str, &str)],
     yolo: bool,
 ) -> Output {
-    let mut cmd = pirs_command(cwd, home, base_url, yolo, extra_env);
-    cmd.args(args).output().expect("failed to run pirs binary")
+    let mut cmd = arqus_command(cwd, home, base_url, yolo, extra_env);
+    cmd.args(args).output().expect("failed to run arqus binary")
 }
 
-/// A configured `pirs` command, for tests that need a child process they can kill.
-pub fn pirs_command(
+/// A configured `arqus` command, for tests that need a child process they can kill.
+pub fn arqus_command(
     cwd: &Path,
     home: &Path,
     base_url: &str,
     yolo: bool,
     extra_env: &[(&str, &str)],
 ) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_pirs"));
+    let mut cmd = Command::new(
+        std::env::var("CARGO_BIN_EXE_arqus")
+            .expect("CARGO_BIN_EXE_arqus; run through cargo test or cargo run --example"),
+    );
     for (k, _) in std::env::vars() {
-        if k.starts_with("PIRS_") {
+        if k.starts_with("ARQUS_") {
             cmd.env_remove(k);
         }
     }
     cmd.current_dir(cwd)
-        .env("PIRS_HOME", home)
-        .env("PIRS_API_KEY", "test-key-123")
-        .env("PIRS_PROVIDER", "openai")
-        .env("PIRS_MODEL", "fake-model")
-        .env("PIRS_BASE_URL", base_url)
-        .env("PIRS_RETRY_BASE_MS", "10");
+        .env("ARQUS_HOME", home)
+        .env("ARQUS_API_KEY", "test-key-123")
+        .env("ARQUS_PROVIDER", "openai")
+        .env("ARQUS_MODEL", "fake-model")
+        .env("ARQUS_BASE_URL", base_url)
+        .env("ARQUS_RETRY_BASE_MS", "10");
     for (k, v) in extra_env {
         cmd.env(k, v);
     }

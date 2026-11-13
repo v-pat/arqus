@@ -2,8 +2,6 @@
 
 use unicode_width::UnicodeWidthChar;
 
-use super::app::{display_text, UiLine};
-
 /// Display width of one character. Tabs count as four columns.
 pub fn char_width(ch: char) -> usize {
     if ch == '\t' {
@@ -73,29 +71,6 @@ fn wrap_indented(content: &str, indent: &str, width: usize) -> Vec<String> {
 
     if line_width > 0 || out.is_empty() {
         out.push(format!("{indent}{line}"));
-    }
-    out
-}
-
-/// Wrap every logical line. Lines inside triple backticks are marked dim.
-pub fn build_wrapped(lines: &[UiLine], width: usize) -> Vec<UiLine> {
-    let width = if width == 0 { usize::MAX } else { width };
-    let mut out = Vec::new();
-    let mut in_fence = false;
-    for line in lines {
-        let marker = line.text.trim_start().starts_with("```");
-        let dim = in_fence && !marker;
-        if marker {
-            in_fence = !in_fence;
-        }
-        let text = display_text(line);
-        for part in wrap_text(&text, width) {
-            out.push(UiLine {
-                kind: line.kind,
-                text: part,
-                dim,
-            });
-        }
     }
     out
 }

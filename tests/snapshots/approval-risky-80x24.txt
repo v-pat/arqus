@@ -1,0 +1,24 @@
+┃ change the build
+
+
+
+
+
+
+
+    ┌ Run command? ────────────────────────────────────────────────────────┐
+    │ RISKY                                                                │
+    │ risky pattern: bulk delete                                           │
+    │                                                                      │
+    │ rm -rf build && cargo build                                          │
+    │                                                                      │
+    │ y allow once · a always allow bash · n deny · esc stop run           │
+    └──────────────────────────────────────────────────────────────────────┘
+
+
+ waiting for your approval
+ approval needed: bash
+┌ prompt ──────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+ /tmp                                        openrouter/test-model  ctx 0%  ask

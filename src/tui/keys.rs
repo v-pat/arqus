@@ -4,6 +4,8 @@
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
+pub use super::actions::Action;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KeyCodeX {
     Char(char),
@@ -33,6 +35,22 @@ pub struct Key {
 }
 
 impl Key {
+    /// `ctrl+p`, `shift+tab`, `f2` ... used by the help dialog.
+    pub fn label(&self) -> String {
+        let mut out = String::new();
+        if self.ctrl {
+            out.push_str("ctrl+");
+        }
+        if self.alt {
+            out.push_str("alt+");
+        }
+        if self.shift {
+            out.push_str("shift+");
+        }
+        out.push_str(&code_name(self.code));
+        out
+    }
+
     pub fn new(code: KeyCodeX) -> Key {
         Key {
             code,
@@ -64,6 +82,27 @@ impl Key {
     }
 }
 
+fn code_name(code: KeyCodeX) -> String {
+    match code {
+        KeyCodeX::Char(c) => c.to_string(),
+        KeyCodeX::Enter => "enter".to_string(),
+        KeyCodeX::Esc => "esc".to_string(),
+        KeyCodeX::Tab => "tab".to_string(),
+        KeyCodeX::BackTab => "tab".to_string(),
+        KeyCodeX::Backspace => "backspace".to_string(),
+        KeyCodeX::Delete => "delete".to_string(),
+        KeyCodeX::Up => "up".to_string(),
+        KeyCodeX::Down => "down".to_string(),
+        KeyCodeX::Left => "left".to_string(),
+        KeyCodeX::Right => "right".to_string(),
+        KeyCodeX::Home => "home".to_string(),
+        KeyCodeX::End => "end".to_string(),
+        KeyCodeX::PageUp => "pageup".to_string(),
+        KeyCodeX::PageDown => "pagedown".to_string(),
+        KeyCodeX::F(n) => format!("f{n}"),
+    }
+}
+
 /// Convert one crossterm event. Key releases are ignored.
 pub fn from_crossterm(event: KeyEvent) -> Option<Key> {
     if event.kind == KeyEventKind::Release {
@@ -76,6 +115,8 @@ pub fn from_crossterm(event: KeyEvent) -> Option<Key> {
         KeyCode::Char(c) => KeyCodeX::Char(c),
         KeyCode::Enter => KeyCodeX::Enter,
         KeyCode::Esc => KeyCodeX::Esc,
+        // Some terminals report Shift+Tab as Tab with the SHIFT modifier.
+        KeyCode::Tab if shift => KeyCodeX::BackTab,
         KeyCode::Tab => KeyCodeX::Tab,
         KeyCode::BackTab => {
             shift = true;
@@ -161,36 +202,6 @@ fn parse_code(name: &str) -> Option<KeyCodeX> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Action {
-    InputChar(char),
-    Submit,
-    Newline,
-    Escape,
-    Quit,
-    CtrlC,
-    CtrlD,
-    Backspace,
-    Delete,
-    MoveLeft,
-    MoveRight,
-    WordLeft,
-    WordRight,
-    LineStart,
-    LineEnd,
-    DeleteWord,
-    KillToStart,
-    KillToEnd,
-    TabComplete,
-    HistoryUp,
-    HistoryDown,
-    ScrollUp,
-    ScrollDown,
-    ScrollTop,
-    ScrollBottom,
-    Help,
-}
-
 #[derive(Debug, Clone)]
 pub struct KeyMap {
     bindings: Vec<(Key, Action)>,
@@ -222,13 +233,45 @@ impl KeyMap {
         bind(Key::ctrl(C::Char('w')), DeleteWord);
         bind(Key::ctrl(C::Char('u')), KillToStart);
         bind(Key::ctrl(C::Char('k')), KillToEnd);
+        bind(Key::ctrl(C::Char('y')), Yank);
         bind(Key::new(C::Up), HistoryUp);
         bind(Key::new(C::Down), HistoryDown);
+        bind(Key::ctrl(C::Char('r')), HistorySearch);
+        bind(Key::alt(C::Up), QueueBack);
         bind(Key::new(C::PageUp), ScrollUp);
         bind(Key::new(C::PageDown), ScrollDown);
         bind(Key::new(C::Home), ScrollTop);
         bind(Key::new(C::End), ScrollBottom);
+        bind(Key::ctrl(C::End), ScrollBottom);
+        bind(Key::new(C::Char('?')), Help);
+        bind(Key::ctrl(C::Char('p')), Palette);
+        bind(Key::ctrl(C::Char('l')), Models);
+        bind(Key::shift(C::BackTab), CycleMode);
+        bind(Key::new(C::F(2)), CycleModel);
+        bind(Key::ctrl(C::Char('t')), ToggleThinking);
+        bind(Key::ctrl(C::Char('o')), ToggleToolOutput);
         map
+    }
+
+    /// Every default binding, for the help dialog.
+    pub fn bindings(&self) -> Vec<(Key, Action)> {
+        self.bindings.clone()
+    }
+
+    /// Drop every binding for one action.
+    pub fn remove_action(&mut self, action: Action) {
+        self.bindings.retain(|(_, bound)| *bound != action);
+    }
+
+    /// Bind one key. Returns the action that owned the key before.
+    pub fn replace_key(&mut self, key: Key, action: Action) -> Option<Action> {
+        if let Some((_, old)) = self.bindings.iter_mut().find(|(bound, _)| *bound == key) {
+            let previous = *old;
+            *old = action;
+            return Some(previous);
+        }
+        self.bindings.push((key, action));
+        None
     }
 
     pub fn action(&self, key: Key) -> Option<Action> {

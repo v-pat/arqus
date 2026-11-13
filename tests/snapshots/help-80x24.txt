@@ -1,0 +1,24 @@
+
+  ┌ Shortcuts ───────────────────────────────────────────────────────────────┐
+  │ Keys                  ctrl+y yank           Commands                     │
+  │ enter send            up older prompt       /connect Add or change a pro…│
+  │ alt+enter newline     down newer prompt     /new Start a new session     │
+  │ ctrl+j newline        ctrl+r history        /sessions List saved sessions│
+  │ esc close / abort     alt+up take queued    /rename Rename this session  │
+  │ ctrl+c interrupt      pageup scroll up      /tree Switch branch in the s…│
+  │ ctrl+d quit           pagedown scroll down  /fork Branch from the curren…│
+  │ backspace backspace   home top              /compact Summarize old conte…│
+  │ delete delete         end bottom            /copy Copy the last answer   │
+  │ tab complete          ctrl+end bottom       /export Export the conversat…│
+  │ left left             ? this help           /mode ask · auto · plan      │
+  │ right right           ctrl+p palette        /models Pick a model         │
+  │ alt+left word left    ctrl+l models         /model Switch model: /model …│
+  │ alt+right word right  shift+tab cycle mode  /theme Change the theme      │
+  │ ctrl+a line start     f2 cycle model        /thinking Show or hide think…│
+  │ ctrl+e line end       ctrl+t thinking       /settings Open settings      │
+  │ ctrl+w delete word    ctrl+o tool output    /help List keys and commands │
+  │ ctrl+u kill to start                        /quit Quit arqus             │
+  │ ctrl+k kill to end                                                       │
+  │ esc close                                                                │
+  └──────────────────────────────────────────────────────────────────────────┘
+ ~/code/my-project  main*    openrouter/deepseek/deepseek-v4-flash  ctx 0%  ask

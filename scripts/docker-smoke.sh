@@ -4,7 +4,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-IMAGE="${PIRS_IMAGE:-pirs:dev}"
+IMAGE="${ARQUS_IMAGE:-arqus:dev}"
 FAILED=0
 
 pass() { printf 'PASS  %s\n' "$1"; }
@@ -24,15 +24,15 @@ else
     fail "could not read the container user: $UID_OUT"
 fi
 
-echo "==> check: pirs --version works in the container"
+echo "==> check: arqus --version works in the container"
 if VERSION_OUT=$(docker run --rm "$IMAGE" --version 2>&1); then
-    pass "pirs --version -> $VERSION_OUT"
+    pass "arqus --version -> $VERSION_OUT"
 else
-    fail "pirs --version failed: $VERSION_OUT"
+    fail "arqus --version failed: $VERSION_OUT"
 fi
 
 echo "==> check: a mounted project folder is writable both ways"
-PROJ=$(mktemp -d "${TMPDIR:-/tmp}/pirs-smoke.XXXXXX")
+PROJ=$(mktemp -d "${TMPDIR:-/tmp}/arqus-smoke.XXXXXX")
 trap 'rm -rf "$PROJ"' EXIT INT TERM
 if docker run --rm -v "$PROJ":/work --entrypoint sh "$IMAGE" -c 'echo hello > /work/from-container.txt' 2>&1; then
     if [ -f "$PROJ/from-container.txt" ] && [ "$(cat "$PROJ/from-container.txt")" = "hello" ]; then

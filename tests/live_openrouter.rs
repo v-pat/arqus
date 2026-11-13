@@ -1,7 +1,7 @@
 //! Stage 17 live checks against a real OpenRouter model.
 //!
-//! Every test is `#[ignore]`, needs `PIRS_LIVE=1`, `PIRS_API_KEY` and
-//! `PIRS_LIVE_MODEL`, and costs real money. Run them with:
+//! Every test is `#[ignore]`, needs `ARQUS_LIVE=1`, `ARQUS_API_KEY` and
+//! `ARQUS_LIVE_MODEL`, and costs real money. Run them with:
 //!
 //! `scripts/live-smoke.sh`
 //!
@@ -30,13 +30,13 @@ fn live_l1_reply() {
         &live,
         &project.path,
         &home.path,
-        &["-p", "Reply with exactly: PIRS_OK"],
+        &["-p", "Reply with exactly: ARQUS_OK"],
     );
     ensure_exit_ok(&output, &home.path, "L1 reply");
     ensure(
-        stdout(&output).contains("PIRS_OK"),
+        stdout(&output).contains("ARQUS_OK"),
         &home.path,
-        format!("L1: stdout had no PIRS_OK:\n{}", stdout(&output)),
+        format!("L1: stdout had no ARQUS_OK:\n{}", stdout(&output)),
     );
     ensure_cost(&output, &home.path, "L1 reply");
 }
@@ -165,7 +165,7 @@ fn live_l6_compaction() {
     };
     let project = TempDir::new("live_l6");
     let home = TempDir::new("live_l6_home");
-    let settings_dir = project.path.join(".pirs");
+    let settings_dir = project.path.join(".arqus");
     fs::create_dir_all(&settings_dir).unwrap();
     // The stage's 3000/500/800 cannot compact here: the system prompt and tool
     // schemas are about 850 tokens, and four 5-line replies add only about 19

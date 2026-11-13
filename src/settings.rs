@@ -1,9 +1,10 @@
-//! User settings: `<PIRS_HOME>/settings.json` and `<cwd>/.pirs/settings.json`.
+//! User settings: `<ARQUS_HOME>/settings.json` and `<cwd>/.arqus/settings.json`.
 //!
 //! Precedence, highest first: CLI flag, environment variable, project settings,
 //! global settings, built-in default. The API key is never stored here; it comes
-//! only from `PIRS_API_KEY`.
+//! only from `ARQUS_API_KEY`.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -45,7 +46,11 @@ pub struct Settings {
     /// Folders outside the project where write and edit are allowed.
     /// `~` is the home folder; a relative path is relative to the project.
     pub allow_paths: Vec<String>,
+    /// Key overrides: action name to one key or a comma-separated list.
+    pub keybinds: BTreeMap<String, KeyBindSpec>,
 }
+
+pub use crate::settings_keybinds::KeyBindSpec;
 
 /// The compaction keys inside settings.json.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -68,18 +73,18 @@ pub struct LimitOptions {
 }
 
 impl Settings {
-    /// Settings for `cwd`, using the real pirs home folder.
+    /// Settings for `cwd`, using the real arqus home folder.
     pub fn load(cwd: &Path) -> Settings {
-        Settings::load_in(&crate::home::pirs_home(), cwd)
+        Settings::load_in(&crate::home::arqus_home(), cwd)
     }
 
-    /// Same as `load`, but with an explicit pirs home folder. Tests use this.
+    /// Same as `load`, but with an explicit arqus home folder. Tests use this.
     /// A missing or broken file is skipped; a broken file prints a warning.
     pub fn load_in(home: &Path, cwd: &Path) -> Settings {
         let mut out = Settings::default();
         let paths = [
             home.join("settings.json"),
-            cwd.join(".pirs").join("settings.json"),
+            cwd.join(".arqus").join("settings.json"),
         ];
         for path in paths {
             let Ok(text) = fs::read_to_string(&path) else {
@@ -134,6 +139,7 @@ impl Settings {
         }
         self.skill_folders.extend(other.skill_folders);
         self.allow_paths.extend(other.allow_paths);
+        self.keybinds.extend(other.keybinds);
     }
 
     /// Built-in compaction defaults with the settings keys applied.
@@ -181,17 +187,40 @@ pub struct EnvOverrides {
     pub base_url: Option<String>,
     pub context_window: Option<u64>,
     pub api_key: Option<String>,
+    /// Provider key variables, captured once so key resolution is testable.
+    pub keys: BTreeMap<String, String>,
 }
 
 impl EnvOverrides {
     pub fn from_env() -> Self {
-        Self {
-            provider: env_nonempty("PIRS_PROVIDER"),
-            model: env_nonempty("PIRS_MODEL"),
-            base_url: env_nonempty("PIRS_BASE_URL"),
-            context_window: env_nonempty("PIRS_CONTEXT_WINDOW").and_then(|text| text.parse().ok()),
-            api_key: env_nonempty("PIRS_API_KEY"),
+        let mut keys = BTreeMap::new();
+        for info in crate::catalog::PROVIDERS {
+            for name in info.env_vars {
+                if let Some(value) = env_nonempty(name) {
+                    keys.insert((*name).to_string(), value);
+                }
+            }
         }
+        if let Some(value) = env_nonempty(crate::catalog::UNIVERSAL_ENV) {
+            keys.insert(crate::catalog::UNIVERSAL_ENV.to_string(), value);
+        }
+        Self {
+            provider: env_nonempty("ARQUS_PROVIDER"),
+            model: env_nonempty("ARQUS_MODEL"),
+            base_url: env_nonempty("ARQUS_BASE_URL"),
+            context_window: env_nonempty("ARQUS_CONTEXT_WINDOW").and_then(|text| text.parse().ok()),
+            api_key: env_nonempty("ARQUS_API_KEY"),
+            keys,
+        }
+    }
+
+    /// Value of one key variable, if it was set when the snapshot was taken.
+    pub fn key(&self, name: &str) -> Option<String> {
+        self.keys.get(name).cloned().or_else(|| {
+            (name == crate::catalog::UNIVERSAL_ENV)
+                .then(|| self.api_key.clone())
+                .flatten()
+        })
     }
 
     /// The CLI flag beats the environment; the environment beats settings;

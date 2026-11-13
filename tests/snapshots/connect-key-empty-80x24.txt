@@ -1,0 +1,24 @@
+
+
+
+
+
+
+
+     ┌ Connect · OpenRouter ──────────────────────────────────────────────┐
+     │ OpenRouter                                                         │
+     │                                                                    │
+     │ key:                                                               │
+     │ create one: https://openrouter.ai/settings/keys                    │
+     │                                                                    │
+     │                                                                    │
+     │                                                                    │
+     │ enter check · ctrl+o open key page · ctrl+u clear · esc back       │
+     └────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+ /tmp                                                  no provider  ctx 0%  ask

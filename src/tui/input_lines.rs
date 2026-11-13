@@ -1,8 +1,9 @@
 //! Line geometry and the visible window of the prompt box.
 
 use unicode_width::UnicodeWidthChar;
+use unicode_width::UnicodeWidthStr;
 
-use super::input::InputState;
+use super::input::{marker_index, paste_label, InputState, LinePart};
 
 impl InputState {
     pub(super) fn line_start(&self) -> usize {
@@ -46,11 +47,52 @@ impl InputState {
     pub fn cursor_column(&self) -> usize {
         self.chars[self.line_start()..self.cursor]
             .iter()
-            .map(|&c| match c {
+            .map(|&c| self.char_width(c))
+            .sum()
+    }
+
+    /// One char's display width; a paste marker counts as its label.
+    fn char_width(&self, c: char) -> usize {
+        match marker_index(c) {
+            Some(index) => self
+                .pastes
+                .get(index)
+                .map(|paste| paste_label(paste.chars().count()).width())
+                .unwrap_or(1),
+            None => match c {
                 '\t' => 4,
                 c => c.width().unwrap_or(0),
-            })
-            .sum()
+            },
+        }
+    }
+
+    /// A line split into plain text and collapsed-paste markers.
+    pub fn line_parts(&self, line: usize) -> Vec<LinePart> {
+        let Some(chars) = self.chars.split(|&c| c == '\n').nth(line) else {
+            return Vec::new();
+        };
+        let mut parts: Vec<LinePart> = Vec::new();
+        let mut buf = String::new();
+        for &c in chars {
+            match marker_index(c) {
+                Some(index) => {
+                    if !buf.is_empty() {
+                        parts.push(LinePart::Text(std::mem::take(&mut buf)));
+                    }
+                    let chars = self
+                        .pastes
+                        .get(index)
+                        .map(|paste| paste.chars().count())
+                        .unwrap_or(0);
+                    parts.push(LinePart::Paste(chars));
+                }
+                None => buf.push(c),
+            }
+        }
+        if !buf.is_empty() {
+            parts.push(LinePart::Text(buf));
+        }
+        parts
     }
 
     /// Visible line range: at most `max` rows, scrolled to keep the cursor.

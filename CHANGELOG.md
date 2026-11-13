@@ -1,12 +1,12 @@
 # Changelog
 
-All notable changes to `pirs`. The version in `Cargo.toml` is the source of
-truth; `pirs --version` prints it. One section per build stage.
+All notable changes to `arqus`. The version in `Cargo.toml` is the source of
+truth; `arqus --version` prints it. One section per build stage.
 
 ## 0.2.0 — 2026-11-07
 
 First stable release. Stages 12 to 26 are complete except the paid live and
-eval checks, which need `PIRS_API_KEY` (see `evals/BASELINE.md`).
+eval checks, which need `ARQUS_API_KEY` (see `evals/BASELINE.md`).
 
 ### Stage 26: Stability gate
 
@@ -25,10 +25,10 @@ eval checks, which need `PIRS_API_KEY` (see `evals/BASELINE.md`).
 
 ### Stage 25: Docker sandbox
 
-- `Dockerfile` and `.dockerignore` build a Linux image that runs `pirs` as the
+- `Dockerfile` and `.dockerignore` build a Linux image that runs `arqus` as the
   non-root `agent` user.
-- `scripts/pirs-docker` mounts only the current folder and forwards only the
-  `PIRS_*` variables, with dropped capabilities, no-new-privileges and memory,
+- `scripts/arqus-docker` mounts only the current folder and forwards only the
+  `ARQUS_*` variables, with dropped capabilities, no-new-privileges and memory,
   CPU and process caps.
 - `scripts/docker-smoke.sh` proves the isolation: non-root user, working
   `--version`, a writable mount, no `.ssh`, and no host folders visible.
@@ -103,14 +103,14 @@ eval checks, which need `PIRS_API_KEY` (see `evals/BASELINE.md`).
 
 - Local scripted SSE server and `tests/e2e_*.rs` black-box suites.
 
-### Stage 12: PIRS_HOME and the debug log
+### Stage 12: ARQUS_HOME and the debug log
 
-- `PIRS_HOME` relocates all state; `--debug` / `PIRS_DEBUG` write redacted JSON
+- `ARQUS_HOME` relocates all state; `--debug` / `ARQUS_DEBUG` write redacted JSON
   lines to `debug.log` with rotation.
 
 ### Stage 11: Settings file
 
-- `settings.json` at `<PIRS_HOME>` and `<cwd>/.pirs`, with precedence and
+- `settings.json` at `<ARQUS_HOME>` and `<cwd>/.arqus`, with precedence and
   project overlay.
 
 ## 0.1.0 — stages 0 to 11

@@ -62,14 +62,14 @@ pub enum PathOp {
     Write,
 }
 
-/// Everything `check_path` needs. Built once when pirs starts.
+/// Everything `check_path` needs. Built once when arqus starts.
 #[derive(Debug, Clone, Default)]
 pub struct Guard {
     pub cwd: PathBuf,
     /// Folders outside `cwd` where writes are allowed (settings `allow_paths`).
     pub allow_paths: Vec<PathBuf>,
-    /// The pirs home folder: settings and history. Never read by the model.
-    pub pirs_home: PathBuf,
+    /// The arqus home folder: settings and history. Never read by the model.
+    pub arqus_home: PathBuf,
     /// The user's home folder, for `~/.ssh` and friends.
     pub user_home: Option<PathBuf>,
 }
@@ -81,7 +81,7 @@ impl Guard {
             path,
             op,
             &self.allow_paths,
-            &self.pirs_home,
+            &self.arqus_home,
             self.user_home.as_deref(),
         )
     }
@@ -96,7 +96,7 @@ pub fn check_path(
     path: &str,
     op: PathOp,
     allow_paths: &[PathBuf],
-    pirs_home: &Path,
+    arqus_home: &Path,
     user_home: Option<&Path>,
 ) -> Result<PathBuf, String> {
     let candidate = if Path::new(path).is_absolute() {
@@ -107,7 +107,7 @@ pub fn check_path(
     let resolved = resolve(candidate);
 
     if op == PathOp::Read {
-        for dir in sensitive_dirs(pirs_home, user_home) {
+        for dir in sensitive_dirs(arqus_home, user_home) {
             if is_under(&dir, &resolved) {
                 return Err(format!(
                     "refusing to read {}: it is under the protected folder {}",
@@ -165,8 +165,8 @@ pub fn expand_allow_paths(values: &[String], cwd: &Path, home: Option<&Path>) ->
     out
 }
 
-fn sensitive_dirs(pirs_home: &Path, user_home: Option<&Path>) -> Vec<PathBuf> {
-    let mut out = vec![resolve(pirs_home.to_path_buf())];
+fn sensitive_dirs(arqus_home: &Path, user_home: Option<&Path>) -> Vec<PathBuf> {
+    let mut out = vec![resolve(arqus_home.to_path_buf())];
     if let Some(home) = user_home {
         for name in [".ssh", ".aws", ".gnupg", ".config/gcloud", ".kube"] {
             out.push(resolve(home.join(name)));

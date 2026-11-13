@@ -1,20 +1,20 @@
 
-
   ┌ Shortcuts ───────────────────────────────────────────┐
-  │ enter                    send, or queue while running│
-  │ alt+enter / ctrl+j       newline                     │
-  │ esc                      close dialog / abort run    │
-  │ ctrl+c                   abort / clear / quit twice  │
-  │ ctrl+d                   quit on empty input         │
-  │ ctrl+a / ctrl+e          start / end of line         │
-  │ ctrl+w / ctrl+u / ctrl+k delete word / start / end   │
-  │ up / down                prompt history              │
-  │ pageup / pagedown        scroll transcript           │
-  │ home / end               top / bottom of transcript  │
-  │ ?                        this dialog                 │
-  │                                                      │
+  │ Keys            ctrl+y yank     Commands             │
+  │ enter send      up older prom…  /connect Add or chan…│
+  │ alt+enter newl… down newer pr…  /new Start a new ses…│
+  │ ctrl+j newline  ctrl+r history  /sessions List saved…│
+  │ esc close / ab… alt+up take q…  /rename Rename this …│
+  │ ctrl+c interru… pageup scroll…  /tree Switch branch …│
+  │ ctrl+d quit     pagedown scro…  /fork Branch from th…│
+  │ backspace back… home top        /compact Summarize o…│
+  │ delete delete   end bottom      /copy Copy the last …│
+  │ tab complete    ctrl+end bott…  /export Export the c…│
+  │ left left       ? this help     /mode ask · auto · p…│
+  │ right right     ctrl+p palette  /models Pick a model │
+  │ alt+left word … ctrl+l models   /model Switch model:…│
+  │ alt+right word… shift+tab cyc…  /theme Change the th…│
+  │ ctrl+a line st… f2 cycle model  /thinking Show or hi…│
   │ esc close                                            │
-te└──────────────────────────────────────────────────────┘ea
-┌ prompt ──────────────────────────────────────────────────┐
-│                                                          │
-└──────────────────────────────────────────────────────────┘
+  └──────────────────────────────────────────────────────┘
+ /tmp                              no provider  ctx 0%  ask

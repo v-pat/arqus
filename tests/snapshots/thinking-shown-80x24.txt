@@ -1,0 +1,24 @@
+┃ why does it fail?
+▸ The test reads the old fixture. I should check the file first.
+Let me check the fixture.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+┌ prompt ──────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+ /tmp                                        openrouter/test-model  ctx 0%  ask

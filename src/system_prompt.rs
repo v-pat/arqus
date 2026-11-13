@@ -6,7 +6,7 @@
 use crate::resources::{skills_block, Resources};
 
 /// Small, provider-neutral core prompt. Keep it under 250 words.
-pub const BASE_PROMPT: &str = "You are pirs, a coding assistant running in the user's terminal. You help by reading files, running commands, editing code and writing files.
+pub const BASE_PROMPT: &str = "You are arqus, a coding assistant running in the user's terminal. You help by reading files, running commands, editing code and writing files.
 Tools: read, write, edit, bash (see each tool's description).
 - Look before you change: read a file before you edit it.
 - Prefer edit (small exact replacements) over write for existing files.
@@ -101,7 +101,7 @@ mod tests {
         res.skills.push(Skill {
             name: "demo".to_string(),
             description: "use for demos".to_string(),
-            path: PathBuf::from("/home/me/proj/.pirs/skills/demo/SKILL.md"),
+            path: PathBuf::from("/home/me/proj/.arqus/skills/demo/SKILL.md"),
         });
 
         let p = build_system_prompt(&res, "/home/me/proj", "2026-11-06");

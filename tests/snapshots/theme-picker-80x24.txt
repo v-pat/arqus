@@ -1,0 +1,24 @@
+
+
+    ┌ Theme · 1/4 ─────────────────────────────────────────────────────────┐
+    │ ›                                                                    │
+    │ * dark                                                               │
+    │   light                                                              │
+    │   mono                                                               │
+    │   dark (256 colors)                                                  │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │ ↑↓ preview · enter keep · esc restore                                │
+    └──────────────────────────────────────────────────────────────────────┘
+
+ ~/code/my-project  main*    openrouter/deepseek/deepseek-v4-flash  ctx 0%  ask

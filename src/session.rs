@@ -22,9 +22,9 @@ pub fn project_slug(cwd: &str) -> String {
     cwd.replace(['/', '.'], "-")
 }
 
-/// `<PIRS_HOME>/sessions/<slug>/` for the given working directory.
+/// `<ARQUS_HOME>/sessions/<slug>/` for the given working directory.
 pub fn sessions_dir(cwd: &str) -> PathBuf {
-    crate::home::pirs_home()
+    crate::home::arqus_home()
         .join("sessions")
         .join(project_slug(cwd))
 }
@@ -146,6 +146,36 @@ impl Session {
         self.leaf_id = Some(id.to_string());
         Ok(())
     }
+}
+
+/// The title shown for a session: the last `session_name` custom entry, else
+/// the first user message. Never longer than 60 characters.
+pub fn title(entries: &[Entry]) -> String {
+    let mut name = None;
+    let mut first_user = None;
+    for entry in entries {
+        match &entry.kind {
+            EntryKind::Custom { custom_type, data } if custom_type == "session_name" => {
+                if let Some(text) = data.get("name").and_then(|value| value.as_str()) {
+                    if !text.trim().is_empty() {
+                        name = Some(text.to_string());
+                    }
+                }
+            }
+            EntryKind::Message {
+                message: crate::types::Message::User { text },
+            } if first_user.is_none() => {
+                first_user = Some(text.clone());
+            }
+            _ => {}
+        }
+    }
+    flatten(&name.or(first_user).unwrap_or_default())
+}
+
+fn flatten(text: &str) -> String {
+    let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    flat.chars().take(60).collect()
 }
 
 /// Walk from `leaf` up to the root. Returns entries ordered root -> leaf.

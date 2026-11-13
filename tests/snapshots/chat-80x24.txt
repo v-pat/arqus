@@ -1,0 +1,24 @@
+┃ fix the failing test in util.py
+I'll run the tests first to see the failure.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+┌ prompt ──────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+ ~/code/my-project  main*   openrouter/deepseek/deepseek-v4-flash  ctx 12%  ask

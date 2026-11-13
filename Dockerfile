@@ -10,9 +10,9 @@ ARG EXTRA_PACKAGES=""
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates libssl3 git curl build-essential pkg-config python3 ripgrep jq less procps ${EXTRA_PACKAGES} \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=build /src/target/release/pirs /usr/local/bin/pirs
+COPY --from=build /src/target/release/arqus /usr/local/bin/arqus
 RUN useradd -m -u 1000 -s /bin/bash agent
 USER agent
-ENV HOME=/home/agent PIRS_HOME=/home/agent/.pirs TERM=xterm-256color
+ENV HOME=/home/agent ARQUS_HOME=/home/agent/.arqus TERM=xterm-256color
 WORKDIR /work
-ENTRYPOINT ["pirs"]
+ENTRYPOINT ["arqus"]

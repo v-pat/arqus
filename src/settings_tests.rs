@@ -1,7 +1,7 @@
 use super::*;
 
 fn tmp() -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("pirs_settings_{}", uuid::Uuid::new_v4()));
+    let dir = std::env::temp_dir().join(format!("arqus_settings_{}", uuid::Uuid::new_v4()));
     fs::create_dir_all(&dir).unwrap();
     dir
 }
@@ -29,7 +29,7 @@ fn project_overrides_global_scalars() {
         r#"{"model":"anthropic:global","compaction":{"reserve_tokens":1000}}"#,
     );
     write(
-        &project.join(".pirs/settings.json"),
+        &project.join(".arqus/settings.json"),
         r#"{"base_url":"http://localhost:11434/v1","compaction":{"keep_recent_tokens":5000}}"#,
     );
 
@@ -49,7 +49,7 @@ fn skill_folders_accumulate() {
         r#"{"skill_folders":["~/shared-skills"]}"#,
     );
     write(
-        &project.join(".pirs/settings.json"),
+        &project.join(".arqus/settings.json"),
         r#"{"skill_folders":["tools/skills"]}"#,
     );
 
@@ -66,7 +66,7 @@ fn approval_and_allow_paths_load_and_overlay() {
         r#"{"approval":"ask","allow_paths":["~/shared"]}"#,
     );
     write(
-        &project.join(".pirs/settings.json"),
+        &project.join(".arqus/settings.json"),
         r#"{"approval":"auto","allow_paths":["data"]}"#,
     );
 
@@ -80,7 +80,7 @@ fn broken_file_is_skipped_without_losing_the_other() {
     let home = tmp();
     let project = tmp();
     write(&home.join("settings.json"), r#"{"model":"openai:gpt"}"#);
-    write(&project.join(".pirs/settings.json"), "{ not json");
+    write(&project.join(".arqus/settings.json"), "{ not json");
 
     let found = Settings::load_in(&home, &project);
     assert_eq!(found.model.as_deref(), Some("openai:gpt"));
@@ -169,7 +169,7 @@ fn limits_are_read_and_overlaid() {
         r#"{"limits":{"max_cost_per_run":1.25,"max_rounds":9}}"#,
     );
     write(
-        &project.join(".pirs/settings.json"),
+        &project.join(".arqus/settings.json"),
         r#"{"limits":{"max_cost_per_session":7.5,"max_output_tokens":256,"max_tokens_per_run":1000}}"#,
     );
 
@@ -206,4 +206,32 @@ fn bad_settings_model_is_an_error() {
         ..Default::default()
     };
     assert!(EnvOverrides::default().resolve(&settings, None).is_err());
+}
+
+#[test]
+fn keybinds_accept_one_key_or_array_and_project_wins() {
+    let home = tmp();
+    let project = tmp();
+    write(
+        &home.join("settings.json"),
+        r#"{"keybinds":{"palette":"ctrl+k","models":["ctrl+l","f3"]}}"#,
+    );
+    write(
+        &project.join(".arqus/settings.json"),
+        r#"{"keybinds":{"newline":"alt+enter,ctrl+j","palette":"ctrl+o"}}"#,
+    );
+
+    let found = Settings::load_in(&home, &project);
+    assert_eq!(
+        found.keybinds.get("palette"),
+        Some(&KeyBindSpec::One("ctrl+o".to_string()))
+    );
+    assert_eq!(
+        found.keybinds.get("models").map(KeyBindSpec::keys),
+        Some(vec!["ctrl+l".to_string(), "f3".to_string()])
+    );
+    assert_eq!(
+        found.keybinds.get("newline").map(KeyBindSpec::keys),
+        Some(vec!["alt+enter".to_string(), "ctrl+j".to_string()])
+    );
 }

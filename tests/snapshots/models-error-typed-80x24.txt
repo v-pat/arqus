@@ -1,0 +1,24 @@
+
+
+    ┌ Select model · openrouter · 1/1 ─────────────────────────────────────┐
+    │ › my-model                                                           │
+    │   Use "my-model" as model id                                         │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │ models: HTTP 500 provider trouble                                    │
+    │ ↑↓ select · enter use · esc close                                    │
+    └──────────────────────────────────────────────────────────────────────┘
+
+ /tmp                                                  no provider  ctx 0%  ask

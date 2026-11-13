@@ -1,17 +1,45 @@
 #!/bin/sh
-# Run pirs inside a container that sees only the current folder.
-# Usage: pirs-docker [pirs arguments]    (cd into the project first)
+# Run arqus inside a hardened container that sees only the current folder.
+# Usage: arqus-docker [arqus arguments]    (cd into the project first)
 set -eu
-IMAGE="${PIRS_IMAGE:-pirs:dev}"
-: "${PIRS_API_KEY:?set PIRS_API_KEY first}"
-STATE="${PIRS_DOCKER_STATE:-$HOME/.pirs-docker}"
+
+IMAGE="${ARQUS_IMAGE:-arqus:dev}"
+: "${ARQUS_API_KEY:?set ARQUS_API_KEY first}"
+
+# Guardrail: Never mount the host home directory or root filesystem accidentally
+if [ "$PWD" = "$HOME" ] || [ "$PWD" = "/" ]; then
+    if [ "${ARQUS_DOCKER_ALLOW_ROOT:-0}" != "1" ]; then
+        echo "error: refusing to mount $PWD into container (would expose your entire home or root filesystem)." >&2
+        echo "Run arqus-docker inside a specific project folder, or set ARQUS_DOCKER_ALLOW_ROOT=1." >&2
+        exit 1
+    fi
+fi
+
+STATE="${ARQUS_DOCKER_STATE:-$HOME/.arqus-docker}"
 mkdir -p "$STATE"
+chmod 700 "$STATE"
+
 if [ -t 0 ] && [ -t 1 ]; then TTY="-it"; else TTY="-i"; fi
+
+NET_OPTS=""
+if [ "${ARQUS_DOCKER_OFFLINE:-0}" = "1" ]; then
+    NET_OPTS="--network=none"
+elif [ -n "${ARQUS_DOCKER_NETWORK:-}" ]; then
+    NET_OPTS="--network=${ARQUS_DOCKER_NETWORK}"
+fi
+
+WORK_MOUNT="-v $PWD:/work"
+if [ "${ARQUS_DOCKER_RO:-0}" = "1" ]; then
+    WORK_MOUNT="-v $PWD:/work:ro"
+fi
+
 exec docker run --rm $TTY \
   --cap-drop=ALL --security-opt no-new-privileges \
-  --memory="${PIRS_DOCKER_MEMORY:-4g}" --cpus="${PIRS_DOCKER_CPUS:-4}" --pids-limit=512 \
-  -e PIRS_API_KEY -e PIRS_MODEL -e PIRS_PROVIDER -e PIRS_BASE_URL -e PIRS_CONTEXT_WINDOW \
-  -v "$PWD":/work \
-  -v "$STATE":/home/agent/.pirs \
+  --tmpfs /tmp:rw,nosuid,size=512m \
+  $NET_OPTS \
+  --memory="${ARQUS_DOCKER_MEMORY:-4g}" --cpus="${ARQUS_DOCKER_CPUS:-4}" --pids-limit=512 \
+  -e ARQUS_API_KEY -e ARQUS_MODEL -e ARQUS_PROVIDER -e ARQUS_BASE_URL -e ARQUS_CONTEXT_WINDOW \
+  $WORK_MOUNT \
+  -v "$STATE":/home/agent/.arqus \
   -w /work \
   "$IMAGE" "$@"

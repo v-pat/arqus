@@ -1,5 +1,6 @@
 use super::*;
 use crate::agent::AgentEvent;
+use crate::tui::block::{Block, ToolState};
 use serde_json::json;
 use std::path::Path;
 
@@ -12,20 +13,32 @@ fn app() -> App {
     )
 }
 
+fn line_text(line: &ratatui::text::Line) -> String {
+    line.spans
+        .iter()
+        .map(|span| span.content.as_ref())
+        .collect()
+}
+
 #[test]
-fn text_deltas_merge_into_one_line() {
+fn text_deltas_merge_into_one_block() {
     let mut app = app();
     app.running = true;
     app.apply_event(AgentEvent::TextDelta("he".to_string()));
     app.apply_event(AgentEvent::TextDelta("llo".to_string()));
 
-    assert_eq!(app.lines.len(), 1);
-    assert_eq!(app.lines[0].kind, LineKind::Assistant);
-    assert_eq!(app.lines[0].text, "hello");
+    assert_eq!(app.blocks.len(), 1);
+    match &app.blocks[0] {
+        Block::Assistant { text, streaming } => {
+            assert_eq!(text, "hello");
+            assert!(streaming);
+        }
+        other => panic!("expected an assistant block, got {other:?}"),
+    }
 }
 
 #[test]
-fn tool_start_and_end_make_two_lines() {
+fn tool_start_and_end_make_one_block() {
     let mut app = app();
     app.apply_event(AgentEvent::ToolStart {
         name: "read".to_string(),
@@ -37,39 +50,50 @@ fn tool_start_and_end_make_two_lines() {
         is_error: false,
     });
 
-    assert_eq!(app.lines.len(), 2);
-    assert_eq!(app.lines[0].kind, LineKind::ToolCall);
-    assert!(app.lines[0].text.contains("read"));
-    assert_eq!(app.lines[1].kind, LineKind::ToolResult);
-    assert!(app.lines[1].text.contains("file body"));
+    assert_eq!(app.blocks.len(), 1);
+    match &app.blocks[0] {
+        Block::Tool(tool) => {
+            assert_eq!(tool.summary, "read a.rs (lines 1-2000)");
+            assert_eq!(tool.output, "file body");
+            assert_eq!(tool.state, ToolState::Ok);
+            assert!(tool.elapsed.is_some());
+        }
+        other => panic!("expected a tool block, got {other:?}"),
+    }
 }
 
 #[test]
-fn tool_result_is_cut_to_ten_lines() {
+fn a_tool_end_without_a_start_still_makes_a_block() {
     let mut app = app();
-    let text: String = (0..25).map(|i| format!("line {i}\n")).collect();
     app.apply_event(AgentEvent::ToolEnd {
         name: "bash".to_string(),
-        text,
+        text: "out".to_string(),
         is_error: false,
     });
-
-    assert_eq!(app.lines.len(), 11);
-    assert!(app.lines[10].text.contains("15 more lines"));
+    assert_eq!(app.blocks.len(), 1);
+    assert!(matches!(&app.blocks[0], Block::Tool(tool) if tool.state == ToolState::Ok));
 }
 
 #[test]
-fn turn_done_stops_running() {
+fn turn_done_stops_running_and_closes_the_stream() {
     let mut app = app();
     app.running = true;
+    app.apply_event(AgentEvent::TextDelta("hello".to_string()));
     app.apply_event(AgentEvent::TurnDone);
 
     assert!(!app.running);
     assert_eq!(app.status, "ready");
+    assert!(matches!(
+        &app.blocks[0],
+        Block::Assistant {
+            streaming: false,
+            ..
+        }
+    ));
 }
 
 #[test]
-fn text_after_a_tool_starts_a_new_line() {
+fn text_after_a_tool_starts_a_new_block() {
     let mut app = app();
     app.apply_event(AgentEvent::TextDelta("first".to_string()));
     app.apply_event(AgentEvent::ToolStart {
@@ -78,23 +102,29 @@ fn text_after_a_tool_starts_a_new_line() {
     });
     app.apply_event(AgentEvent::TextDelta("second".to_string()));
 
-    assert_eq!(app.lines.len(), 3);
-    assert_eq!(app.lines[0].text, "first");
-    assert_eq!(app.lines[2].text, "second");
+    assert_eq!(app.blocks.len(), 3);
+    assert!(matches!(&app.blocks[0], Block::Assistant { text, .. } if text == "first"));
+    assert!(matches!(&app.blocks[2], Block::Assistant { text, .. } if text == "second"));
 }
 
 #[test]
-fn error_is_red_material_and_can_be_multiline() {
+fn an_error_event_becomes_a_red_notice() {
     let mut app = app();
-    app.apply_event(AgentEvent::ToolEnd {
-        name: "bash".to_string(),
-        text: "boom\nsecond".to_string(),
-        is_error: true,
-    });
+    app.apply_event(AgentEvent::Error("boom\nsecond".to_string()));
 
-    assert_eq!(app.lines.len(), 2);
-    assert_eq!(app.lines[0].kind, LineKind::Error);
-    assert!(app.lines[0].text.contains("boom"));
+    assert_eq!(app.blocks.len(), 1);
+    assert!(matches!(&app.blocks[0], Block::Notice(text, Level::Error) if text.contains("boom")));
+}
+
+#[test]
+fn thinking_deltas_merge_and_survive_a_text_block() {
+    let mut app = app();
+    app.apply_event(AgentEvent::ThinkingDelta("one ".to_string()));
+    app.apply_event(AgentEvent::ThinkingDelta("two".to_string()));
+    app.apply_event(AgentEvent::TextDelta("done".to_string()));
+
+    assert_eq!(app.blocks.len(), 2);
+    assert!(matches!(&app.blocks[0], Block::Thinking { text } if text == "one two"));
 }
 
 #[test]
@@ -102,7 +132,7 @@ fn scrolling_follows_until_the_user_scrolls_up() {
     let mut app = app();
     app.set_page(2);
     for i in 0..10 {
-        app.push(LineKind::Info, format!("line {i}"));
+        app.info(format!("line {i}"));
     }
     assert_eq!(app.scroll, 8);
 
@@ -120,7 +150,7 @@ fn home_and_end_move_the_view() {
     let mut app = app();
     app.set_page(2);
     for i in 0..10 {
-        app.push(LineKind::Info, format!("line {i}"));
+        app.info(format!("line {i}"));
     }
 
     app.scroll_top();
@@ -137,7 +167,7 @@ fn streaming_stays_put_while_the_user_reads_history() {
     let mut app = app();
     app.set_page(2);
     for i in 0..6 {
-        app.push(LineKind::Info, format!("line {i}"));
+        app.info(format!("line {i}"));
     }
     app.scroll_up(2);
     let frozen = app.scroll;
@@ -152,11 +182,14 @@ fn streaming_stays_put_while_the_user_reads_history() {
 }
 
 #[test]
-fn resize_rewraps_long_lines() {
+fn resize_rerenders_long_lines() {
     let mut app = app();
     app.set_page(5);
     app.set_width(80);
-    app.push(LineKind::Assistant, "x".repeat(100));
+    app.push_block(Block::Assistant {
+        text: "x".repeat(100),
+        streaming: false,
+    });
     assert_eq!(app.wrapped.len(), 2);
 
     app.set_width(20);
@@ -168,36 +201,24 @@ fn spinner_and_elapsed_time_follow_the_ticks() {
     let mut app = app();
     app.running = true;
     app.on_tick();
-    assert_eq!(app.spinner(), "/");
+    assert_eq!(app.spinner(), "⠙");
     for _ in 0..9 {
         app.on_tick();
     }
     assert_eq!(app.elapsed_secs(), 1);
-    assert_eq!(app.spinner(), "-");
+    assert_eq!(app.spinner(), "⠋");
 }
 
 #[test]
-fn code_fence_content_is_dim() {
-    let mut app = app();
-    app.push(LineKind::Assistant, "before".to_string());
-    app.push(LineKind::Assistant, "```".to_string());
-    app.push(LineKind::Assistant, "let x = 1;".to_string());
-    app.push(LineKind::Assistant, "```".to_string());
-    app.push(LineKind::Assistant, "after".to_string());
-
-    let dims: Vec<bool> = app.wrapped.iter().map(|l| l.dim).collect();
-    assert_eq!(dims, vec![false, false, true, false, false]);
-}
-
-#[test]
-fn user_lines_keep_their_prefix_after_wrapping() {
+fn user_blocks_keep_their_bar_after_wrapping() {
     let mut app = app();
     app.set_width(10);
     app.push_user("alpha beta gamma");
 
-    let texts: Vec<&str> = app.wrapped.iter().map(|l| l.text.as_str()).collect();
-    assert_eq!(texts[0], "> alpha");
+    let texts: Vec<String> = app.wrapped.iter().map(line_text).collect();
+    assert_eq!(texts[0], "┃ alpha");
     assert!(texts.len() > 1);
+    assert!(texts[1].starts_with("┃ "));
 }
 
 #[test]
@@ -218,6 +239,22 @@ fn ctrl_c_idle_needs_a_second_press_inside_the_window() {
 }
 
 #[test]
+fn info_blocks_keep_the_welcome_screen() {
+    let mut app = app();
+    app.info("note");
+    assert!(!app.has_conversation());
+    app.push_user("hi");
+    assert!(app.has_conversation());
+}
+
+#[test]
+fn compaction_alone_keeps_the_welcome_screen() {
+    let mut app = app();
+    app.apply_event(AgentEvent::Compacted { tokens_before: 900 });
+    assert!(!app.has_conversation());
+}
+
+#[test]
 fn queued_prompts_wait_until_the_agent_accepts_them() {
     let mut app = app();
     app.running = true;
@@ -230,8 +267,7 @@ fn queued_prompts_wait_until_the_agent_accepts_them() {
 
     app.apply_event(AgentEvent::UserMessage("hello".to_string()));
     assert!(app.queue.is_empty());
-    assert_eq!(app.lines.last().unwrap().kind, LineKind::User);
-    assert_eq!(app.lines.last().unwrap().text, "hello");
+    assert!(matches!(app.blocks.last(), Some(Block::User(text)) if text == "hello"));
 }
 
 #[test]

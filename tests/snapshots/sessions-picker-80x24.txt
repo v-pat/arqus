@@ -1,0 +1,24 @@
+
+
+    ┌ sessions · 2/2 ──────────────────────────────────────────────────────┐
+    │ ›                                                                    │
+    │   release prep                                     just now · 1 msgs │
+    │ * fix the failing test                             just now · 1 msgs │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │ ↑↓ select · enter open · ctrl+d delete · esc cancel                  │
+    └──────────────────────────────────────────────────────────────────────┘
+
+ /tmp                                                  no provider  ctx 0%  ask

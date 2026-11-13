@@ -6,7 +6,7 @@ use serde_json::json;
 use std::sync::{Arc, Mutex};
 
 fn temp_dir() -> PathBuf {
-    std::env::temp_dir().join(format!("pirs_agent_{}", new_id()))
+    std::env::temp_dir().join(format!("arqus_agent_{}", new_id()))
 }
 
 fn done(blocks: Vec<Block>, stop: StopReason) -> StreamEvent {
@@ -51,11 +51,12 @@ fn config(cwd: &std::path::Path) -> AgentConfig {
         limits: Limits::default(),
         approver: Approver::Auto,
         allow_risky: false,
+        plan: false,
         approvals: Approvals::default(),
         guard: Guard {
             cwd: cwd.to_path_buf(),
             allow_paths: Vec::new(),
-            pirs_home: cwd.join(".pirs-home"),
+            arqus_home: cwd.join(".arqus-home"),
             user_home: Some(cwd.join(".home")),
         },
     }
@@ -557,5 +558,110 @@ async fn allow_always_is_remembered_for_one_tool_only() {
     assert_eq!(
         approval_tools(&events),
         vec!["write".to_string(), "bash".to_string()]
+    );
+}
+
+#[tokio::test]
+async fn plan_mode_refuses_changes_but_allows_reads() {
+    let cwd = temp_dir();
+    std::fs::create_dir_all(&cwd).unwrap();
+    std::fs::write(cwd.join("keep.txt"), "before\n").unwrap();
+
+    let script = vec![
+        vec![done(
+            vec![
+                call("call_r", "read", json!({"path": "keep.txt"})),
+                call(
+                    "call_w",
+                    "write",
+                    json!({"path": "new.txt", "content": "no"}),
+                ),
+                call(
+                    "call_e",
+                    "edit",
+                    json!({"path": "keep.txt", "old_text": "before", "new_text": "after"}),
+                ),
+                call("call_b", "bash", json!({"command": "touch shell.txt"})),
+            ],
+            StopReason::ToolUse,
+        )],
+        vec![done(vec![text("planned")], StopReason::Stop)],
+    ];
+
+    let dir = temp_dir();
+    let mut session = Session::create(&dir, "/x").unwrap();
+    let llm = mock(script);
+    let (tx, rx) = tokio::sync::mpsc::channel(8);
+    drop(rx);
+    let (_steer_tx, steer_rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut cfg = config(&cwd);
+    cfg.plan = true;
+    run_prompt(
+        &mut session,
+        &llm,
+        &cfg,
+        "plan it".to_string(),
+        tx,
+        steer_rx,
+        tokio::sync::mpsc::channel(1).1,
+    )
+    .await
+    .unwrap();
+
+    let results: Vec<(String, bool)> = session
+        .entries
+        .iter()
+        .filter_map(|entry| match &entry.kind {
+            EntryKind::Message {
+                message: Message::ToolResult { text, is_error, .. },
+            } => Some((text.clone(), *is_error)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(results.len(), 4);
+    assert!(!results[0].1);
+    assert!(results[0].0.contains("before"));
+    for (text, is_error) in &results[1..] {
+        assert!(is_error);
+        assert_eq!(text, super::PLAN_REFUSAL);
+    }
+    assert!(!cwd.join("new.txt").exists());
+    assert!(!cwd.join("shell.txt").exists());
+    assert_eq!(
+        std::fs::read_to_string(cwd.join("keep.txt")).unwrap(),
+        "before\n"
+    );
+}
+
+#[tokio::test]
+async fn plan_mode_adds_the_note_to_the_request_system_prompt() {
+    let cwd = temp_dir();
+    std::fs::create_dir_all(&cwd).unwrap();
+    let script = vec![vec![done(vec![text("ok")], StopReason::Stop)]];
+    let queue = Arc::new(Mutex::new(std::collections::VecDeque::from(script)));
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let llm = Llm::MockCapture(queue, seen.clone());
+    let dir = temp_dir();
+    let mut session = Session::create(&dir, "/x").unwrap();
+    let (tx, rx) = tokio::sync::mpsc::channel(8);
+    drop(rx);
+    let (_steer_tx, steer_rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut cfg = config(&cwd);
+    cfg.plan = true;
+    run_prompt(
+        &mut session,
+        &llm,
+        &cfg,
+        "go".to_string(),
+        tx,
+        steer_rx,
+        tokio::sync::mpsc::channel(1).1,
+    )
+    .await
+    .unwrap();
+
+    let requests = seen.lock().unwrap();
+    assert!(
+        requests[0].contains("test\\nPlan mode: changes are disabled. Describe the plan instead.")
     );
 }

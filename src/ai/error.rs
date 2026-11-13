@@ -31,7 +31,7 @@ impl LlmError {
         match self {
             LlmError::Auth(msg) => {
                 let code = if msg.starts_with("403") { "403" } else { "401" };
-                format!("Authentication failed ({code}). Check PIRS_API_KEY.")
+                format!("Authentication failed ({code}). Check ARQUS_API_KEY.")
             }
             LlmError::PaymentRequired(_) => {
                 "No credits left, or this API key's spending limit is used up (402).".to_string()
@@ -177,9 +177,9 @@ pub struct RetrySettings {
 impl RetrySettings {
     pub fn from_env() -> RetrySettings {
         RetrySettings {
-            base_ms: env_number("PIRS_RETRY_BASE_MS", 1000),
-            max_retries: env_number("PIRS_MAX_RETRIES", u64::from(MAX_RETRIES)) as u32,
-            idle: Duration::from_secs(env_number("PIRS_IDLE_TIMEOUT_SECS", 60)),
+            base_ms: env_number("ARQUS_RETRY_BASE_MS", 1000),
+            max_retries: env_number("ARQUS_MAX_RETRIES", u64::from(MAX_RETRIES)) as u32,
+            idle: Duration::from_secs(env_number("ARQUS_IDLE_TIMEOUT_SECS", 60)),
         }
     }
 
@@ -209,11 +209,11 @@ pub fn friendly_error(err: &anyhow::Error) -> String {
 pub fn validate_config(cfg: &ModelConfig) -> Result<(), String> {
     if cfg.model.trim().is_empty() {
         return Err(
-            "no model configured. Set PIRS_MODEL or use --model provider:model.".to_string(),
+            "no model configured. Set ARQUS_MODEL or use --model provider:model.".to_string(),
         );
     }
     if cfg.api_key.trim().is_empty() && !is_local_base_url(&cfg.base_url) {
-        return Err("no API key. Set PIRS_API_KEY (not needed for localhost).".to_string());
+        return Err("no API key. Set ARQUS_API_KEY (not needed for localhost).".to_string());
     }
     Ok(())
 }

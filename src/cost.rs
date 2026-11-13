@@ -97,9 +97,9 @@ pub fn totals_line(totals: &Totals) -> String {
     )
 }
 
-/// Print-mode closing line: `[pirs] requests=3 in=1234 out=210 cost=$0.0042 time=12.3s`.
+/// Print-mode closing line: `[arqus] requests=3 in=1234 out=210 cost=$0.0042 time=12.3s`.
 pub fn summary_line(totals: &Totals, seconds: f64) -> String {
-    format!("[pirs] {} time={seconds:.1}s", totals_line(totals))
+    format!("[arqus] {} time={seconds:.1}s", totals_line(totals))
 }
 
 /// Hard limits for one run and one session.

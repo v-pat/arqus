@@ -1,0 +1,24 @@
+┃ make the tests pass
+
+    ┌ history · 1/2 ───────────────────────────────────────────────────────┐
+    │ ›                                                                    │
+    │   now run cargo test                                              #1 │
+    │   fix the failing test                                            #2 │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │ ↑↓ select · enter edit · esc cancel                                  │
+    └──────────────────────────────────────────────────────────────────────┘
+
+ ~/code/my-project           openrouter/deepseek/deepseek-v4-flash  ctx 0%  ask

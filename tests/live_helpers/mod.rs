@@ -17,47 +17,47 @@ pub struct Live {
 /// The live tests return early, with one "skipped" line, unless the human
 /// asked for live runs and supplied both values.
 pub fn live() -> Option<Live> {
-    if std::env::var("PIRS_LIVE").unwrap_or_default() != "1" {
-        println!("skipped: PIRS_LIVE is not 1");
+    if std::env::var("ARQUS_LIVE").unwrap_or_default() != "1" {
+        println!("skipped: ARQUS_LIVE is not 1");
         return None;
     }
-    let Some(key) = std::env::var("PIRS_API_KEY")
+    let Some(key) = std::env::var("ARQUS_API_KEY")
         .ok()
         .filter(|value| !value.trim().is_empty())
     else {
-        println!("skipped: PIRS_API_KEY is not set");
+        println!("skipped: ARQUS_API_KEY is not set");
         return None;
     };
-    let Some(model) = std::env::var("PIRS_LIVE_MODEL")
+    let Some(model) = std::env::var("ARQUS_LIVE_MODEL")
         .ok()
         .filter(|value| !value.trim().is_empty())
     else {
-        println!("skipped: PIRS_LIVE_MODEL is not set");
+        println!("skipped: ARQUS_LIVE_MODEL is not set");
         return None;
     };
     Some(Live { model, key })
 }
 
-/// Run the real binary with a temporary `PIRS_HOME`. All inherited `PIRS_*`
+/// Run the real binary with a temporary `ARQUS_HOME`. All inherited `ARQUS_*`
 /// variables are removed first, so the human's provider and base URL cannot
 /// leak into a live run.
 pub fn run_live(live: &Live, project: &Path, home: &Path, args: &[&str]) -> Output {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_pirs"));
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_arqus"));
     for (name, _) in std::env::vars() {
-        if name.starts_with("PIRS_") {
+        if name.starts_with("ARQUS_") {
             cmd.env_remove(name);
         }
     }
     cmd.current_dir(project)
-        .env("PIRS_HOME", home)
-        .env("PIRS_API_KEY", &live.key)
-        .env("PIRS_PROVIDER", "openrouter")
-        .env("PIRS_MODEL", &live.model)
-        .env("PIRS_MAX_OUTPUT_TOKENS", MAX_OUTPUT_TOKENS)
+        .env("ARQUS_HOME", home)
+        .env("ARQUS_API_KEY", &live.key)
+        .env("ARQUS_PROVIDER", "openrouter")
+        .env("ARQUS_MODEL", &live.model)
+        .env("ARQUS_MAX_OUTPUT_TOKENS", MAX_OUTPUT_TOKENS)
         .args(["--debug", "--yolo"])
         .args(args)
         .output()
-        .expect("failed to run the pirs binary")
+        .expect("failed to run the arqus binary")
 }
 
 pub fn stdout(output: &Output) -> String {
@@ -94,10 +94,10 @@ pub fn ensure_exit_ok(output: &Output, home: &Path, label: &str) {
     );
 }
 
-/// Costs from the `[pirs] ... cost=$...` summary lines.
+/// Costs from the `[arqus] ... cost=$...` summary lines.
 pub fn costs(text: &str) -> Vec<f64> {
     let mut out = Vec::new();
-    for line in text.lines().filter(|line| line.contains("[pirs]")) {
+    for line in text.lines().filter(|line| line.contains("[arqus]")) {
         for word in line.split_whitespace() {
             if let Some(value) = word.strip_prefix("cost=$") {
                 if let Ok(parsed) = value.parse::<f64>() {
@@ -111,7 +111,7 @@ pub fn costs(text: &str) -> Vec<f64> {
 
 pub fn requests(text: &str) -> Option<u64> {
     text.lines()
-        .filter(|line| line.contains("[pirs]"))
+        .filter(|line| line.contains("[arqus]"))
         .flat_map(|line| line.split_whitespace())
         .find_map(|word| word.strip_prefix("requests="))
         .and_then(|value| value.parse().ok())
@@ -124,7 +124,7 @@ pub fn ensure_cost(output: &Output, home: &Path, label: &str) {
     ensure(
         !found.is_empty(),
         home,
-        format!("{label}: no '[pirs] ... cost=$' line in stderr:\n{err}"),
+        format!("{label}: no '[arqus] ... cost=$' line in stderr:\n{err}"),
     );
     for cost in found {
         println!("[live] {label}: cost=${cost:.4}");

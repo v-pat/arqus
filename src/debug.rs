@@ -1,6 +1,6 @@
-//! Optional debug log at `<PIRS_HOME>/debug.log`.
+//! Optional debug log at `<ARQUS_HOME>/debug.log`.
 //!
-//! Enabled by `--debug` or `PIRS_DEBUG=1`. One JSON object per line, so the
+//! Enabled by `--debug` or `ARQUS_DEBUG=1`. One JSON object per line, so the
 //! file can be read with `jq` or any JSON-lines tool. Headers are never
 //! logged, and every line goes through `redact` before it is written.
 //!
@@ -25,9 +25,9 @@ pub fn init(flag: bool, home: &Path) {
     DEBUG.get_or_init(|| open_log(flag || env_on(), home));
 }
 
-/// True when `PIRS_DEBUG` asks for debug output.
+/// True when `ARQUS_DEBUG` asks for debug output.
 pub fn env_on() -> bool {
-    match std::env::var("PIRS_DEBUG") {
+    match std::env::var("ARQUS_DEBUG") {
         Ok(text) => text == "1" || text.eq_ignore_ascii_case("true"),
         Err(_) => false,
     }
@@ -38,7 +38,7 @@ pub fn log(kind: &str, value: Value) {
     let Some(Some(lock)) = DEBUG.get() else {
         return;
     };
-    let key = std::env::var("PIRS_API_KEY").unwrap_or_default();
+    let key = std::env::var("ARQUS_API_KEY").unwrap_or_default();
     append_line(lock, kind, value, &key);
 }
 
@@ -94,7 +94,7 @@ fn render(kind: &str, value: &Value, key: &str) -> String {
 
 /// Replace the configured API key and any `sk-...` token.
 pub fn redact(s: &str) -> String {
-    let key = std::env::var("PIRS_API_KEY").unwrap_or_default();
+    let key = std::env::var("ARQUS_API_KEY").unwrap_or_default();
     redact_with(s, &key)
 }
 

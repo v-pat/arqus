@@ -4,7 +4,7 @@ use std::io::Write;
 use std::time::Instant;
 
 fn tmp() -> PathBuf {
-    std::env::temp_dir().join(format!("pirs_session_{}", new_id()))
+    std::env::temp_dir().join(format!("arqus_session_{}", new_id()))
 }
 
 fn user(t: &str) -> EntryKind {
@@ -116,6 +116,54 @@ fn list_sessions_is_newest_first() {
         .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
         .collect();
     assert_eq!(names, vec!["300_c.jsonl", "200_b.jsonl", "100_a.jsonl"]);
+}
+
+#[test]
+fn title_prefers_the_last_rename_then_the_first_user_message() {
+    let mut entries = vec![
+        entry("a", None, user("fix the failing test")),
+        entry("b", Some("a"), user("second message")),
+    ];
+    assert_eq!(title(&entries), "fix the failing test");
+
+    entries.push(entry(
+        "c",
+        Some("b"),
+        EntryKind::Custom {
+            custom_type: "session_name".to_string(),
+            data: serde_json::json!({"name": "release prep"}),
+        },
+    ));
+    assert_eq!(title(&entries), "release prep");
+
+    entries.push(entry(
+        "d",
+        Some("c"),
+        EntryKind::Custom {
+            custom_type: "session_name".to_string(),
+            data: serde_json::json!({"name": "final name"}),
+        },
+    ));
+    assert_eq!(title(&entries), "final name");
+    assert_eq!(title(&[]), "");
+}
+
+#[test]
+fn title_is_flattened_and_cut_to_60_characters() {
+    let text = format!("{}\nsecond line", "a".repeat(80));
+    let entries = vec![entry("a", None, user(&text))];
+    let shown = title(&entries);
+    assert_eq!(shown.chars().count(), 60);
+    assert!(!shown.contains('\n'));
+}
+
+fn entry(id: &str, parent: Option<&str>, kind: EntryKind) -> Entry {
+    Entry {
+        id: id.to_string(),
+        parent_id: parent.map(str::to_string),
+        ts: 0,
+        kind,
+    }
 }
 
 #[test]

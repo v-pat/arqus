@@ -88,6 +88,11 @@ impl History {
     pub fn get(&self, index: usize) -> Option<&str> {
         self.entries.get(index).map(String::as_str)
     }
+
+    /// Oldest first, as stored.
+    pub fn entries(&self) -> &[String] {
+        &self.entries
+    }
 }
 
 /// Keep only the newest `MAX_ENTRIES` prompts.

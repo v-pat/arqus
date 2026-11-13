@@ -1,0 +1,24 @@
+
+
+    ┌ Connect a provider · 1/8 ────────────────────────────────────────────┐
+    │ ›                                                                    │
+    │  Recommended                                                         │
+    │   OpenRouter    One key, hundreds of models, per-key spending limits │
+    │   Anthropic                                            Claude models │
+    │  Other                                                               │
+    │   OpenAI (GPT)                                            GPT models │
+    │   DeepSeek                                  DeepSeek models directly │
+    │   Groq                                           Very fast inference │
+    │   Ollama (local)                                               local │
+    │   LM Studio (local)                                            local │
+    │   Custom OpenAI-compatible endpoint...                         local │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │ ↑↓ select · enter choose · esc close                                 │
+    └──────────────────────────────────────────────────────────────────────┘
+
+ /tmp                                                  no provider  ctx 0%  ask

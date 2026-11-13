@@ -12,7 +12,7 @@ use crate::session::new_id;
 use crate::types::{Block, EntryKind, Message, StopReason};
 
 fn tmp() -> PathBuf {
-    std::env::temp_dir().join(format!("pirs_comp_{}", new_id()))
+    std::env::temp_dir().join(format!("arqus_comp_{}", new_id()))
 }
 
 fn user(text: &str) -> EntryKind {
@@ -289,11 +289,12 @@ async fn agent_compacts_after_a_long_turn() {
         limits: crate::cost::Limits::default(),
         approver: crate::safety::Approver::Auto,
         allow_risky: false,
+        plan: false,
         approvals: crate::safety::Approvals::default(),
         guard: crate::safety::Guard {
             cwd: dir.clone(),
             allow_paths: Vec::new(),
-            pirs_home: dir.join(".pirs-home"),
+            arqus_home: dir.join(".arqus-home"),
             user_home: None,
         },
     };

@@ -13,9 +13,13 @@ pub struct Approval {
 
 impl App {
     /// Store a pending approval request from the agent.
-    pub fn approval_request(&mut self, tool: String, preview: String) {
+    ///
+    /// Returns true when the bell should ring: the window was idle for at
+    /// least 10 seconds (100 ticks of 100 ms).
+    pub fn approval_request(&mut self, tool: String, preview: String) -> bool {
         self.status = format!("approval needed: {tool}");
         self.approval = Some(Approval { tool, preview });
+        self.ticks.saturating_sub(self.last_input_tick) >= 100
     }
 
     /// Send one answer to the agent. False when no request is pending.

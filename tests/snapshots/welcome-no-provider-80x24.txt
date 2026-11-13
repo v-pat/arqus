@@ -1,0 +1,24 @@
+
+
+
+
+
+
+
+                                    a r q u s
+                        a coding agent for your terminal
+
+          ┌──────────────────────────────────────────────────────────┐
+          │ ▌ Ask anything...   try: "fix the failing test"          │
+          └──────────────────────────────────────────────────────────┘
+             no provider connected · press ctrl+p, or type /connect
+
+                 ctrl+p commands    ctrl+l models    ? shortcuts
+
+
+
+
+
+
+
+ ~/code/my-project  main*                              no provider  ctx 0%  ask

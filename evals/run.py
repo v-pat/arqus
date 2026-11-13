@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run small coding tasks with pirs and record pass rate, time and cost.
+"""Run small coding tasks with arqus and record pass rate, time and cost.
 
 Python 3 standard library only. See README.md for the task layout and the
 tuning loop rules.
@@ -24,7 +24,7 @@ EVALS_DIR = Path(__file__).resolve().parent
 REPO_DIR = EVALS_DIR.parent
 TASKS_DIR = EVALS_DIR / "tasks"
 RESULTS_FILE = EVALS_DIR / "results.jsonl"
-DEFAULT_BIN = Path("target/release/pirs")
+DEFAULT_BIN = Path("target/release/arqus")
 TIMEOUT_SECONDS = 300
 CHECK_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_COST = 0.50
@@ -79,12 +79,12 @@ def git(cwd: Path, *args: str) -> None:
     )
 
 
-def pirs_numbers(stderr: str) -> tuple[int | None, float | None]:
-    """Read requests= and cost= from the last [pirs] summary line."""
+def arqus_numbers(stderr: str) -> tuple[int | None, float | None]:
+    """Read requests= and cost= from the last [arqus] summary line."""
     requests = None
     cost = None
     for line in stderr.splitlines():
-        if not line.startswith("[pirs]") or "requests=" not in line:
+        if not line.startswith("[arqus]") or "requests=" not in line:
             continue
         requests = None
         cost = None
@@ -121,7 +121,7 @@ def run_one(
             raise SystemExit(f"task {name}: missing {required}")
     prompt = (task / "prompt.txt").read_text().strip()
 
-    root = Path(tempfile.mkdtemp(prefix=f"pirs-eval-{name}-"))
+    root = Path(tempfile.mkdtemp(prefix=f"arqus-eval-{name}-"))
     work = root / "work"
     home = root / "home"
     home.mkdir()
@@ -131,9 +131,9 @@ def run_one(
     git(
         work,
         "-c",
-        "user.email=eval@pirs.local",
+        "user.email=eval@arqus.local",
         "-c",
-        "user.name=pirs eval",
+        "user.name=arqus eval",
         "commit",
         "-qm",
         "setup",
@@ -143,7 +143,7 @@ def run_one(
     if model_spec:
         cmd.extend(["--model", model_spec])
     env = dict(os.environ)
-    env["PIRS_HOME"] = str(home)
+    env["ARQUS_HOME"] = str(home)
 
     started = time.monotonic()
     exit_code, stdout, stderr, timed_out = run_process(
@@ -157,24 +157,24 @@ def run_one(
     stderr_path.write_text(stderr)
 
     check_env = dict(env)
-    check_env["PIRS_OUT"] = str(stdout_path)
+    check_env["ARQUS_OUT"] = str(stdout_path)
     check_code, check_out, check_err, check_timed_out = run_process(
         ["sh", str(task / "check.sh")], work, check_env, CHECK_TIMEOUT_SECONDS
     )
 
     passed = check_code == 0 and not timed_out and not check_timed_out
-    requests, cost = pirs_numbers(stderr)
+    requests, cost = arqus_numbers(stderr)
 
     reason = ""
     if not passed:
         if timed_out:
-            reason = f"pirs timed out after {TIMEOUT_SECONDS}s"
+            reason = f"arqus timed out after {TIMEOUT_SECONDS}s"
         elif check_timed_out:
             reason = f"check timed out after {CHECK_TIMEOUT_SECONDS}s"
         else:
             detail = (check_err or check_out or "").strip().splitlines()
             reason = detail[-1] if detail else f"check exited {check_code}"
-        reason = f"{reason} (pirs exit {exit_code}, logs: {root})"
+        reason = f"{reason} (arqus exit {exit_code}, logs: {root})"
 
     record = {
         "task": name,
@@ -237,7 +237,7 @@ def print_table(records: list[dict]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run pirs evals.")
+    parser = argparse.ArgumentParser(description="Run arqus evals.")
     parser.add_argument(
         "--tasks",
         help="comma separated task names (default: every task)",
@@ -246,15 +246,15 @@ def main() -> int:
     parser.add_argument(
         "--bin",
         default=str(DEFAULT_BIN),
-        help="pirs binary (default: target/release/pirs)",
+        help="arqus binary (default: target/release/arqus)",
     )
     parser.add_argument(
         "--model",
         default="",
-        help="provider:model passed to pirs (default: use PIRS_MODEL)",
+        help="provider:model passed to arqus (default: use ARQUS_MODEL)",
     )
     args = parser.parse_args()
-    model_label = args.model or os.environ.get("PIRS_MODEL", "") or "default"
+    model_label = args.model or os.environ.get("ARQUS_MODEL", "") or "default"
 
     if args.repeat < 1:
         parser.error("--repeat must be at least 1")
@@ -277,7 +277,7 @@ def main() -> int:
     if not bin_path.is_absolute():
         bin_path = REPO_DIR / bin_path
     if not bin_path.is_file():
-        print(f"error: pirs binary not found: {bin_path}", file=sys.stderr)
+        print(f"error: arqus binary not found: {bin_path}", file=sys.stderr)
         print("build it with: cargo build --release", file=sys.stderr)
         return 2
 

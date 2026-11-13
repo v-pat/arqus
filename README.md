@@ -1,17 +1,17 @@
-# pirs
+# arqus
 
 A small terminal coding agent written in Rust, modeled on the ideas behind
 **pi**: a tiny core, four tools (`read`, `write`, `edit`, `bash`), streaming
 model calls, append-only JSONL sessions with branching, compaction, and a
 ratatui TUI.
 
-`pirs` is a learning project. It works and it is tested, but it is not a
+`arqus` is a learning project. It works and it is tested, but it is not a
 production tool. Read [Limitations](#limitations) before pointing it at a real
 repository.
 
-- Version: `0.2.0` (`pirs --version` prints it)
+- Version: `0.2.0` (`arqus --version` prints it)
 - Status: stages 0 to 25 are done; stage 26 is the release gate
-- Tests: `cargo test` runs 293 tests (249 unit, 44 end-to-end) with no network
+- Tests: `cargo test` runs 612 tests (564 unit, 48 end-to-end) with no network
 - Crates: `serde`, `serde_json`, `anyhow`, `uuid`, `dirs`, `tokio`, `reqwest`,
   `futures-util`, `clap`, `ratatui`, `crossterm`, `unicode-width`
 
@@ -48,9 +48,11 @@ Expected test result (no network, no real key):
 
 ```sh
 $ cargo test
-test result: ok. 249 passed; 0 failed; 0 ignored
+test result: ok. 564 passed; 0 failed; 0 ignored
 test result: ok. 4 passed; 0 failed; 0 ignored      # e2e_basic
+test result: ok. 2 passed; 0 failed; 0 ignored      # e2e_connect
 test result: ok. 9 passed; 0 failed; 0 ignored      # e2e_cost
+test result: ok. 2 passed; 0 failed; 0 ignored      # e2e_crash
 test result: ok. 12 passed; 0 failed; 0 ignored     # e2e_errors
 test result: ok. 4 passed; 0 failed; 0 ignored      # e2e_safety
 test result: ok. 15 passed; 0 failed; 0 ignored     # e2e_stream
@@ -61,8 +63,8 @@ Install and run:
 
 ```sh
 cargo install --path . --force
-pirs --version
-pirs --help
+arqus --version
+arqus --help
 ```
 
 `scripts/check.sh` runs everything CI runs: `cargo fmt --check`, clippy with
@@ -77,51 +79,86 @@ One prompt, assistant text on stdout, short tool lines and one summary on
 stderr.
 
 ```sh
-export PIRS_API_KEY=sk-...
-export PIRS_MODEL=deepseek/deepseek-chat
-export PIRS_BASE_URL=https://openrouter.ai/api/v1
-pirs --no-session -p "list the files in src and summarize them"
+export ARQUS_API_KEY=sk-...
+export ARQUS_MODEL=deepseek/deepseek-chat
+export ARQUS_BASE_URL=https://openrouter.ai/api/v1
+arqus --no-session -p "list the files in src and summarize them"
 ```
 
 A local OpenAI-compatible server:
 
 ```sh
-PIRS_BASE_URL=http://127.0.0.1:11434/v1 \
-PIRS_API_KEY=ollama \
-PIRS_MODEL=qwen3:8b \
-pirs --no-session -p "Reply with exactly: hello from pirs"
+ARQUS_BASE_URL=http://127.0.0.1:11434/v1 \
+ARQUS_API_KEY=ollama \
+ARQUS_MODEL=qwen3:8b \
+arqus --no-session -p "Reply with exactly: hello from arqus"
 ```
 
 Anthropic:
 
 ```sh
-PIRS_API_KEY=sk-ant-... \
-pirs -p "summarize this project" --model anthropic:claude-sonnet-4
+ARQUS_API_KEY=sk-ant-... \
+arqus -p "summarize this project" --model anthropic:claude-sonnet-4
 ```
 
 The last stderr line of a run looks like
-`[pirs] requests=1 in=900 out=40 cost=$0.0001 time=0.8s`.
+`[arqus] requests=1 in=900 out=40 cost=$0.0001 time=0.8s`.
 
 ### Interactive mode
 
 Run with no prompt:
 
 ```sh
-pirs
+arqus
 ```
 
 The TUI shows a transcript, a status bar with model, context usage, session file
 and status, and a prompt box.
 
+## Benchmarks & Evaluation
+
+To verify real-world coding capability, `arqus` includes a rigorous evaluation benchmark suite (`evals/`) covering 13 diverse software engineering tasks. Each task runs `arqus` in an isolated Git workspace and verifies changes with deterministic test checks.
+
+### Benchmark Results (Baseline)
+
+Executed on live OpenRouter using `deepseek/deepseek-v4.1-flash-1017`:
+
+| Task | Category | Description | Status | Time | Cost (USD) |
+|---|---|---|---|---|---|
+| `hello-file` | Tooling | Write a new file with specified content | **PASS** | 5.5s | $0.0004 |
+| `fix-typo` | Precision Editing | Exact single-token correction in source | **PASS** | 7.2s | $0.0007 |
+| `fix-failing-test` | Debugging | Diagnose failing test and fix implementation | **PASS** | 4.7s | $0.0004 |
+| `add-function` | Feature Dev | Implement new function to pass unit tests | **PASS** | 12.8s | $0.0006 |
+| `rename-symbol` | Refactoring | Project-wide symbol rename across usages | **PASS** | 17.4s | $0.0006 |
+| `read-and-answer` | Comprehension | Inspect codebase and answer accurately | **PASS** | 2.5s | $0.0002 |
+| `multi-file-feature` | Coordination | Coordinated changes across multiple files | **PASS** | 6.5s | $0.0007 |
+| `run-and-fix` | Iterative Loop | Run tests via bash, diagnose error, fix code | **PASS** | 7.4s | $0.0007 |
+| `big-file-edit` | Long Context | Search-and-replace edit in large files | **PASS** | 10.5s | $0.0009 |
+| `no-op-restraint` | Restraint | Inspect code and refrain from unwanted changes | **PASS** | 3.2s | $0.0003 |
+| `refuse-outside` | Security Guardrail | Refuse to write files outside the workspace | **PASS** | 2.3s | $0.0002 |
+| `skill-use` | Extensibility | Discover and follow workflows in `.arqus/skills/` | **PASS** | 5.0s | $0.0004 |
+| `survives-compaction` | Compaction | Retain intent across heavy multi-turn compaction | **PASS** | 17.8s | $0.0012 |
+| **TOTAL** | | **13 / 13 Tasks Passed** | **100%** | **avg 7.9s** | **$0.0073** |
+
+*All results recorded in `evals/BASELINE.md` and `evals/results.jsonl`.*
+
+### Key Takeaways for Users
+
+- **High Precision & Success**: 100% pass rate across common developer workflows (debugging, feature additions, refactoring, and multi-file changes).
+- **Sub-Penny Execution**: All 13 complex coding tasks executed for a combined cost of **$0.0073** (less than 1 cent total).
+- **Compaction Resilience**: The agent preserves context and completes multi-turn tasks even when earlier conversation history is summarized into compaction entries.
+- **Safety Boundary Enforcement**: Refuses directory traversal or writing outside the workspace even under `--yolo` mode.
+
+
 ## CLI
 
 ```
-pirs [OPTIONS]
+arqus [OPTIONS]
 
   -p, --prompt <PROMPT>     Run one prompt in print mode
   -c, --continue            Continue the latest session for this directory
-      --no-session          Use a temporary session instead of <PIRS_HOME>/sessions
-      --debug               Append debug JSON lines to <PIRS_HOME>/debug.log
+      --no-session          Use a temporary session instead of <ARQUS_HOME>/sessions
+      --debug               Append debug JSON lines to <ARQUS_HOME>/debug.log
       --model <PROVIDER:MODEL>
                             Pick provider and model, for example
                             anthropic:claude-sonnet-4
@@ -148,10 +185,10 @@ Exit codes:
 | `1` | the prompt or run failed: provider error, cost/token limit, I/O error |
 | `2` | bad configuration or usage: bad flag, unknown provider, missing model |
 
-- With no `-p`, `pirs` starts the TUI.
+- With no `-p`, `arqus` starts the TUI.
 - Known providers: `openai`, `openrouter`, `anthropic`. Any other name uses the
   generic OpenAI-compatible adapter, which covers most local servers.
-- The generic adapter's default base URL is OpenRouter's. Set `PIRS_BASE_URL`
+- The generic adapter's default base URL is OpenRouter's. Set `ARQUS_BASE_URL`
   for another endpoint.
 
 ## Configuration
@@ -160,19 +197,19 @@ Exit codes:
 
 | Variable | Meaning | Default |
 | --- | --- | --- |
-| `PIRS_API_KEY` | Key for every provider. The only accepted key source. | empty |
-| `PIRS_MODEL` | Model name | empty |
-| `PIRS_PROVIDER` | Provider name | `openai` |
-| `PIRS_BASE_URL` | Endpoint | per provider |
-| `PIRS_CONTEXT_WINDOW` | Context size in tokens | 128000, 200000 for Anthropic |
-| `PIRS_HOME` | Global folder for settings, sessions, skills, history, log | `~/.pirs` |
-| `PIRS_MAX_OUTPUT_TOKENS` | Cap for `max_tokens` | 8192 |
-| `PIRS_MAX_RETRIES` | Retries before a transient request fails | 3 |
-| `PIRS_RETRY_BASE_MS` | First retry delay in milliseconds | 1000 |
-| `PIRS_IDLE_TIMEOUT_SECS` | Abort a stream that stays idle this long | 60 |
-| `PIRS_DEBUG` | `1` or `true` turns the debug log on | off |
-| `PIRS_APP_TITLE` | OpenRouter `X-Title` header | `pirs` |
-| `PIRS_HTTP_REFERER` | OpenRouter `HTTP-Referer` header | unset |
+| `ARQUS_API_KEY` | Key for every provider. The only accepted key source. | empty |
+| `ARQUS_MODEL` | Model name | empty |
+| `ARQUS_PROVIDER` | Provider name | `openai` |
+| `ARQUS_BASE_URL` | Endpoint | per provider |
+| `ARQUS_CONTEXT_WINDOW` | Context size in tokens | 128000, 200000 for Anthropic |
+| `ARQUS_HOME` | Global folder for settings, sessions, skills, history, log | `~/.arqus` |
+| `ARQUS_MAX_OUTPUT_TOKENS` | Cap for `max_tokens` | 8192 |
+| `ARQUS_MAX_RETRIES` | Retries before a transient request fails | 3 |
+| `ARQUS_RETRY_BASE_MS` | First retry delay in milliseconds | 1000 |
+| `ARQUS_IDLE_TIMEOUT_SECS` | Abort a stream that stays idle this long | 60 |
+| `ARQUS_DEBUG` | `1` or `true` turns the debug log on | off |
+| `ARQUS_APP_TITLE` | OpenRouter `X-Title` header | `arqus` |
+| `ARQUS_HTTP_REFERER` | OpenRouter `HTTP-Referer` header | unset |
 
 The API key is never printed, stored in settings, or written to the debug log.
 `ModelConfig` has a hand-written `Debug` that redacts it, and every log line
@@ -182,8 +219,8 @@ passes through a redactor that removes the configured key and `sk-...` tokens.
 
 Two optional files:
 
-- `<PIRS_HOME>/settings.json` (global, default `~/.pirs/settings.json`)
-- `<cwd>/.pirs/settings.json` (project, overrides global)
+- `<ARQUS_HOME>/settings.json` (global, default `~/.arqus/settings.json`)
+- `<cwd>/.arqus/settings.json` (project, overrides global)
 
 Every key is optional. A project file can override one key and inherit the rest.
 
@@ -256,7 +293,7 @@ When an approval modal is open it owns the keyboard:
 | `Esc` | Deny and abort the turn |
 
 The box grows to 6 lines and then scrolls. Pasted text keeps its newlines and
-never submits. Prompt history is saved to `<PIRS_HOME>/history.jsonl`: up to 500
+never submits. Prompt history is saved to `<ARQUS_HOME>/history.jsonl`: up to 500
 entries, no consecutive duplicates.
 
 Enter during a running turn queues the text: queued prompts show dim above the
@@ -284,7 +321,7 @@ Mac note: in Terminal.app and iTerm2 set the Option key to "Esc+" (Terminal) or
 | `/help` | TUI | List keys and commands |
 | `/quit`, `/exit` | TUI | Quit |
 | `/skill:name [text]` | both | Inline the full `SKILL.md`, then append `text` |
-| `/name [text]` | both | Run the prompt template `.pirs/prompts/name.md` |
+| `/name [text]` | both | Run the prompt template `.arqus/prompts/name.md` |
 
 Unknown slash words pass through unchanged.
 
@@ -312,19 +349,19 @@ container for real isolation (see [Docker](#docker) below).
   `read` never asks. `y` allows once, `a` allows that tool for the rest of the
   session, `n` denies, `Esc` denies and aborts.
 - In print mode nobody can answer. With `ask`, `bash`, `write` and `edit` return
-  `Approval required. Run pirs with --yolo to allow this.`; `read` still works.
+  `Approval required. Run arqus with --yolo to allow this.`; `read` still works.
   `--yolo` (or `approval: "auto"`) skips the prompts.
 - `write` and `edit` outside the working folder are refused in every mode,
   including `--yolo`. Symlinks are resolved first, so a link that points outside
   counts as outside. Add folders to `allow_paths` to permit them.
 - `read` may leave the project, except under `~/.ssh`, `~/.aws`, `~/.gnupg`,
-  `~/.config/gcloud`, `~/.kube` and `<PIRS_HOME>` (settings and history).
+  `~/.config/gcloud`, `~/.kube` and `<ARQUS_HOME>` (settings and history).
 - A small pattern list marks risky bash commands: `rm -rf /`, `rm -rf ~`,
   `rm -rf *` in the home folder, `sudo`, `mkfs`, `dd if=`, `> /dev/sd`,
   `chmod -R 777 /`, `curl ... | sh`, `wget ... | sh` and `git push --force`.
   The modal shows a red `RISKY` line. In auto mode they are refused unless
   `--allow-risky` is given.
-- At startup pirs warns when the folder is not a git repository, or when it has
+- At startup arqus warns when the folder is not a git repository, or when it has
   uncommitted changes.
 
 ### Limits and runaway protection
@@ -347,9 +384,9 @@ two empty replies in a row. Those stops exit `0`. A cost or token limit exits
 
 ### Location
 
-`<PIRS_HOME>/sessions/<project-slug>/<timestamp>_<id>.jsonl`
+`<ARQUS_HOME>/sessions/<project-slug>/<timestamp>_<id>.jsonl`
 
-The default home is `~/.pirs`. The slug is the working directory with `/` and
+The default home is `~/.arqus`. The slug is the working directory with `/` and
 `.` replaced by `-`.
 
 `--no-session` writes into a temporary folder instead. `-c` reopens the newest
@@ -405,13 +442,13 @@ Compaction:
 
 ### AGENTS.md
 
-Loaded in this order: `<PIRS_HOME>/AGENTS.md`, then `AGENTS.md` from the
+Loaded in this order: `<ARQUS_HOME>/AGENTS.md`, then `AGENTS.md` from the
 filesystem root down to the working directory. `CLAUDE.md` is used when a folder
 has no `AGENTS.md`. Keep it short: it is sent on every request.
 
 ### SYSTEM.md and APPEND_SYSTEM.md
 
-- Project `<cwd>/.pirs/SYSTEM.md` wins over global `<PIRS_HOME>/SYSTEM.md`.
+- Project `<cwd>/.arqus/SYSTEM.md` wins over global `<ARQUS_HOME>/SYSTEM.md`.
 - `SYSTEM.md` replaces the base prompt; `APPEND_SYSTEM.md` appends to it.
 - Only one `APPEND_SYSTEM.md` is used, not both.
 
@@ -429,7 +466,7 @@ description: cut a release and publish the changelog
 ...
 ```
 
-Looked up in `<PIRS_HOME>/skills/`, `<cwd>/.pirs/skills/`, then `skill_folders`
+Looked up in `<ARQUS_HOME>/skills/`, `<cwd>/.arqus/skills/`, then `skill_folders`
 from settings. A later folder wins on a name clash. Only name, description, and
 path go into the system prompt (max 50 skills, 200 characters each). The model
 reads the full file with `read` when the task matches, or you inline it with
@@ -437,7 +474,7 @@ reads the full file with `read` when the task matches, or you inline it with
 
 ### Prompt templates
 
-`<cwd>/.pirs/prompts/name.md` wins over `<PIRS_HOME>/prompts/name.md`.
+`<cwd>/.arqus/prompts/name.md` wins over `<ARQUS_HOME>/prompts/name.md`.
 `$ARGUMENTS` is replaced with the text after the command. Names are limited to
 `[A-Za-z0-9_-]`.
 
@@ -453,18 +490,105 @@ Neutral messages are converted to the provider wire format only inside `ai/`.
 This is what lets one session mix models. Model switches append a `model_change`
 entry instead of rewriting history.
 
-## Test layers
+## Contributor & Developer Guide
+
+Whether you are fixing a bug, adding a new LLM adapter, improving security guardrails, or optimizing the TUI, this guide covers everything you need to work efficiently with `arqus`.
+
+### 1. Developer Environment & Convenience Scripts
+
+The repository includes scripts in `scripts/` to streamline your local workflow without manually exporting environment variables in every shell:
+
+1. **Configure local `.env`**:
+   ```sh
+   cp .env.example .env
+   ```
+   Add your `ARQUS_API_KEY`, default `ARQUS_MODEL`, and preferred `ARQUS_PROVIDER`. `.env` is ignored by Git and never committed.
+
+2. **Run in Dev Mode (`scripts/dev.sh`)**:
+   `scripts/dev.sh` automatically loads `.env` and forwards all arguments to `cargo run`:
+   ```sh
+   ./scripts/dev.sh -p "summarize src/main.rs"   # print mode
+   ./scripts/dev.sh                              # interactive TUI
+   ```
+
+3. **Quick Provider Switching (`scripts/switch.sh`)**:
+   Quickly switch your current shell session between providers:
+   ```sh
+   source scripts/switch.sh openrouter
+   source scripts/switch.sh anthropic
+   source scripts/switch.sh ollama             # local LLM at http://127.0.0.1:11434
+   ```
+
+### 2. Debugging & Inspection
+
+When diagnosing agent loop decisions, context building, or streaming events:
+
+- **Enable Debug Logging**:
+  Add `ARQUS_DEBUG=1` to `.env` or pass `--debug`:
+  ```sh
+  ./scripts/dev.sh --debug -p "explain this crate"
+  ```
+- **Inspect `<ARQUS_HOME>/debug.log`**:
+  `arqus` writes structured, redacted JSON lines recording:
+  - Outgoing HTTP request URLs and payloads.
+  - HTTP status codes and headers (API keys and auth headers are automatically redacted).
+  - Raw SSE line streams received from the provider.
+  - Tool arguments and tool outputs.
+- **Log Rotation**:
+  On startup, if `debug.log` exceeds 5 MB, it is automatically rotated to `debug.log.1`.
+
+### 3. Running Evals & Benchmarks
+
+The evaluation suite tests `arqus` on realistic coding tasks inside isolated Git worktrees:
+
+- **Interactive Runner (`scripts/run-evals.sh`)**:
+  Builds the release binary and runs the benchmark suite with safety budget caps:
+  ```sh
+  ./scripts/run-evals.sh
+  ```
+- **Run Specific Tasks**:
+  ```sh
+  ./scripts/run-evals.sh --tasks hello-file,fix-typo,add-function
+  ```
+- **Run with Specific Model or Budget**:
+  ```sh
+  EVAL_MAX_COST=0.50 ./scripts/run-evals.sh --model openrouter:deepseek/deepseek-chat
+  ```
+- **Direct Python Runner**:
+  ```sh
+  python3 evals/run.py --bin target/release/arqus --repeat 2
+  ```
+
+### 4. Test Layers & CI Checks
+
+`arqus` enforces strict multi-layer testing:
 
 | Layer | What | Command | Network | Cost |
-| --- | --- | --- | --- | --- |
-| L1 unit | pure functions, temp folders | `cargo test` | no | 0 |
-| L2 e2e | the real binary against the fake LLM server (`tests/e2e_*.rs`) | `cargo test` | local only | 0 |
-| L3 live | real OpenRouter, tiny requests (`tests/live_openrouter.rs`) | `scripts/live-smoke.sh` | yes | cents |
-| L4 evals | thirteen coding tasks with pass/fail | `python3 evals/run.py` | yes | cents |
+|---|---|---|---|---|
+| **L1 Unit** | Pure functions, token math, parsers, TUI logic (564 tests) | `cargo test --bin arqus` | No | Free |
+| **L2 E2E** | Black-box tests against in-process mock SSE HTTP server (48 tests) | `cargo test --test 'e2e_*'` | Local loopback | Free |
+| **L3 Live** | Live smoke tests against OpenRouter (`tests/live_openrouter.rs`) | `scripts/live-smoke.sh` | Yes | Cents |
+| **L4 Evals** | 13 live coding benchmark tasks with pass/fail evaluation | `scripts/run-evals.sh` | Yes | Cents |
 
-L3 needs `PIRS_API_KEY` and `PIRS_LIVE_MODEL`. Its tests are `#[ignore]`, so a
-plain `cargo test` never runs them. L4 needs the same two variables plus
-`PIRS_PROVIDER`; see `evals/README.md`.
+**The One-Stop Health Check (`scripts/check.sh`)**:
+Before opening a pull request or committing changes, run:
+```sh
+./scripts/check.sh
+```
+This runs:
+1. `cargo fmt --check`
+2. `cargo clippy --all-targets -- -D warnings`
+3. `cargo test` (all unit and e2e integration tests)
+4. `cargo build --release`
+5. Secret scanner (greps for committed API keys)
+
+### 5. Contributor Rules & Code Philosophy
+
+To keep the codebase lean and maintainable:
+- **Rust Simplicity**: Prefer `String`, `Vec<T>`, `Option<T>`, and `anyhow::Result<T>`. Avoid unnecessary lifetimes or complex generic abstractions.
+- **Keep Files Under 300 Lines**: When a module grows beyond 300 lines, split helpers or companion tests into submodules.
+- **Never Commit Secrets**: Never hardcode API keys or test keys that match standard token patterns (`sk-...`).
+- **Tests First**: Every bug fix must include a reproducing test before landing the fix.
 
 ## Architecture
 
@@ -508,26 +632,26 @@ The container is the real boundary. It sees the project folder mounted at
 `/work` and nothing else from your machine, so `--yolo` is safe inside it.
 
 ```sh
-docker build -t pirs:dev .                     # build once, rebuild after code changes
+docker build -t arqus:dev .                     # build once, rebuild after code changes
 ./scripts/docker-smoke.sh                      # prove the isolation, all checks PASS
 mkdir -p ~/.local/bin
-cp scripts/pirs-docker ~/.local/bin/pirs-docker
+cp scripts/arqus-docker ~/.local/bin/arqus-docker
 
 cd ~/code/my-project
-export PIRS_API_KEY=sk-...
-pirs-docker                                    # the TUI, sandboxed
-pirs-docker --yolo -p "fix the failing test"   # print mode, no approvals
+export ARQUS_API_KEY=sk-...
+arqus-docker                                    # the TUI, sandboxed
+arqus-docker --yolo -p "fix the failing test"   # print mode, no approvals
 ```
 
 The wrapper mounts the current folder at `/work`, keeps sessions in
-`~/.pirs/docker-state` (`PIRS_DOCKER_STATE` overrides it), and forwards only
-`PIRS_API_KEY`, `PIRS_MODEL`, `PIRS_PROVIDER`, `PIRS_BASE_URL` and
-`PIRS_CONTEXT_WINDOW`. It drops all capabilities, sets
-`no-new-privileges`, and caps memory (`PIRS_DOCKER_MEMORY`, default `4g`),
-CPUs (`PIRS_DOCKER_CPUS`, default `4`) and processes (512).
+`~/.arqus/docker-state` (`ARQUS_DOCKER_STATE` overrides it), and forwards only
+`ARQUS_API_KEY`, `ARQUS_MODEL`, `ARQUS_PROVIDER`, `ARQUS_BASE_URL` and
+`ARQUS_CONTEXT_WINDOW`. It drops all capabilities, sets
+`no-new-privileges`, and caps memory (`ARQUS_DOCKER_MEMORY`, default `4g`),
+CPUs (`ARQUS_DOCKER_CPUS`, default `4`) and processes (512).
 
 `scripts/docker-smoke.sh` builds the image and checks: the container user is
-not root, `pirs --version` works, a mounted folder is writable from both
+not root, `arqus --version` works, a mounted folder is writable from both
 sides, `/home/agent/.ssh` does not exist, and no host folder is visible. It
 prints PASS or FAIL per check and exits non-zero on the first failure.
 
@@ -535,7 +659,7 @@ prints PASS or FAIL per check and exits non-zero on the first failure.
 | --- | --- |
 | The rest of the machine's files | The mounted project folder (the agent can change or delete it) |
 | Your SSH keys, cloud credentials and Git credentials | Network access (the agent can reach the internet) |
-| Other repositories on the machine | The API key in the container's environment (the agent can read `$PIRS_API_KEY`) |
+| Other repositories on the machine | The API key in the container's environment (the agent can read `$ARQUS_API_KEY`) |
 
 Use `--yolo` inside the container. Native runs should keep approvals on,
 because on the host `bash` can still write anywhere your user can.
@@ -543,7 +667,7 @@ because on the host `bash` can still write anywhere your user can.
 Variants (documented only, not tested here):
 
 - Node projects: `docker build --build-arg EXTRA_PACKAGES="nodejs npm" -t
-  pirs:node .`, then run with `PIRS_IMAGE=pirs:node pirs-docker`.
+  arqus:node .`, then run with `ARQUS_IMAGE=arqus:node arqus-docker`.
 - Rust projects: use `rust:1-bookworm` as the final base and set
   `CARGO_HOME=/home/agent/.cargo`, so `cargo` works inside the container.
   Build output inside the mounted folder is slower than native; prefer a
@@ -561,7 +685,7 @@ Honest list, matching `PROGRESS.md`:
 - **Thinking blocks are dropped for Anthropic.** Extended-thinking signatures
   are not kept or sent back.
 - **`/model` in the TUI uses the environment, not settings**, and the context
-  window follows the new provider default unless `PIRS_CONTEXT_WINDOW` is set.
+  window follows the new provider default unless `ARQUS_CONTEXT_WINDOW` is set.
 - **No session names.** The resume picker shows raw file names. The status bar
   shows tokens and percentage; `/cost` shows dollars.
 - **No markdown rendering.** Code fences are dimmed and text wraps. Tool results

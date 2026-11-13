@@ -3,5 +3,19 @@
 /test-run
 /.serena
 .DS_Store
+**/.DS_Store
 debug.log
-debug.log.1
+debug.log.*
+*.log
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# Editor and OS files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/

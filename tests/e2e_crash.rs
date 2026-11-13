@@ -1,5 +1,5 @@
 //! Crash safety and corrupt-session recovery, black box against the fake server.
-//! No network and no real key: every run gets its own temp project and PIRS_HOME.
+//! No network and no real key: every run gets its own temp project and ARQUS_HOME.
 
 mod support;
 use support::*;
@@ -58,18 +58,18 @@ fn sigkill_during_a_tool_call_resumes_with_a_synthetic_result() {
         Reply::sse(sse_text(&["resumed fine"])),
     ]);
 
-    let mut child = pirs_command(
+    let mut child = arqus_command(
         &project.path,
         &home.path,
         &fake.url,
         true,
-        &[("PIRS_MAX_OUTPUT_TOKENS", "300")],
+        &[("ARQUS_MAX_OUTPUT_TOKENS", "300")],
     )
     .args(["-p", "run the sleep tool"])
     .stdout(Stdio::null())
     .stderr(Stdio::null())
     .spawn()
-    .expect("spawn pirs");
+    .expect("spawn arqus");
 
     // Wait until the assistant tool call is on disk, then kill the process.
     let deadline = Instant::now() + Duration::from_secs(15);
@@ -86,8 +86,8 @@ fn sigkill_during_a_tool_call_resumes_with_a_synthetic_result() {
         thread::sleep(Duration::from_millis(20));
     }
     assert!(saw_call, "the tool call never reached the session file");
-    child.kill().expect("SIGKILL pirs");
-    child.wait().expect("reap pirs");
+    child.kill().expect("SIGKILL arqus");
+    child.wait().expect("reap arqus");
 
     let session = fs::read_to_string(only_session(&home.path)).unwrap();
     assert!(
@@ -95,7 +95,7 @@ fn sigkill_during_a_tool_call_resumes_with_a_synthetic_result() {
         "the killed run should not have a tool result"
     );
 
-    let second = run_pirs(
+    let second = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -125,7 +125,7 @@ fn corrupt_middle_line_opens_with_a_warning_on_stderr() {
         Reply::sse(sse_text(&["second answer"])),
     ]);
 
-    let first = run_pirs(&project.path, &home.path, &fake.url, &["-p", "one"], &[]);
+    let first = run_arqus(&project.path, &home.path, &fake.url, &["-p", "one"], &[]);
     assert_eq!(first.status.code(), Some(0), "stderr: {}", stderr(&first));
 
     let path = only_session(&home.path);
@@ -135,7 +135,7 @@ fn corrupt_middle_line_opens_with_a_warning_on_stderr() {
     lines.insert(2, "{this is not json".to_string());
     fs::write(&path, format!("{}\n", lines.join("\n"))).unwrap();
 
-    let second = run_pirs(
+    let second = run_arqus(
         &project.path,
         &home.path,
         &fake.url,

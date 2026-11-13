@@ -17,7 +17,8 @@ use crate::types::Message;
 
 mod error;
 pub use error::{
-    classify_http, friendly_error, retry_delay, validate_config, LlmError, RetrySettings,
+    classify_http, friendly_error, is_local_base_url, retry_delay, validate_config, LlmError,
+    RetrySettings,
 };
 
 /// One tool the model may call. `parameters` is a JSON schema.
@@ -50,32 +51,32 @@ pub struct ModelConfig {
 impl ModelConfig {
     /// Read settings from the environment. The key is never printed.
     pub fn from_env() -> Self {
-        let provider = env_or("PIRS_PROVIDER", "openai");
-        let context_window = std::env::var("PIRS_CONTEXT_WINDOW")
+        let provider = env_or("ARQUS_PROVIDER", "openai");
+        let context_window = std::env::var("ARQUS_CONTEXT_WINDOW")
             .ok()
             .and_then(|text| text.parse().ok())
             .unwrap_or_else(|| default_context_window(&provider));
         Self {
-            model: env_or("PIRS_MODEL", ""),
-            base_url: std::env::var("PIRS_BASE_URL")
+            model: env_or("ARQUS_MODEL", ""),
+            base_url: std::env::var("ARQUS_BASE_URL")
                 .unwrap_or_else(|_| default_base_url(&provider).to_string()),
-            api_key: env_or("PIRS_API_KEY", ""),
+            api_key: env_or("ARQUS_API_KEY", ""),
             context_window,
             provider,
         }
     }
 
     /// Parse `provider:model`, keeping the other settings from the environment.
-    /// An explicit `PIRS_BASE_URL` or `PIRS_CONTEXT_WINDOW` still wins.
+    /// An explicit `ARQUS_BASE_URL` or `ARQUS_CONTEXT_WINDOW` still wins.
     pub fn from_model_spec(spec: &str) -> anyhow::Result<Self> {
         let (provider, model) = split_model_spec(spec)?;
         let mut cfg = Self::from_env();
         cfg.provider = provider;
         cfg.model = model;
-        if std::env::var("PIRS_BASE_URL").is_err() {
+        if std::env::var("ARQUS_BASE_URL").is_err() {
             cfg.base_url = default_base_url(&cfg.provider).to_string();
         }
-        if std::env::var("PIRS_CONTEXT_WINDOW").is_err() {
+        if std::env::var("ARQUS_CONTEXT_WINDOW").is_err() {
             cfg.context_window = default_context_window(&cfg.provider);
         }
         Ok(cfg)

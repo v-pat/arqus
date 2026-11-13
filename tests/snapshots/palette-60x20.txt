@@ -1,0 +1,20 @@
+
+
+    ┌ Commands · 1/22 ─────────────────────────────────┐
+    │ ›                                                │
+    │  Session                                         │
+    │   /connect                                       │
+    │   /new                                           │
+    │   /sessions                                      │
+    │   /rename                                        │
+    │   /tree                                          │
+    │   /fork                                          │
+    │   /compact                                       │
+    │   /copy                                          │
+    │   /export                                        │
+    │  Model                                           │
+    │                                                  │
+    │ ↑↓ select · enter run · esc close                │
+    └──────────────────────────────────────────────────┘
+
+ …y-project  openrouter/deepseek/deepseek-v4-…  ctx 0%  ask

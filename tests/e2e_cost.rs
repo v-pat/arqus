@@ -34,7 +34,7 @@ fn run_cost_limit_stops_before_the_third_request() {
         Reply::sse(costly_tool("echo 3", 0.30)),
     ]);
 
-    let output = run_pirs(
+    let output = run_arqus(
         &project.path,
         &home.path,
         &server.url,
@@ -49,7 +49,7 @@ fn run_cost_limit_stops_before_the_third_request() {
         err.contains("cost limit reached: $0.60 of $0.50 (limits.max_cost_per_run)"),
         "stderr: {err}"
     );
-    assert!(err.contains("[pirs] requests=2"), "stderr: {err}");
+    assert!(err.contains("[arqus] requests=2"), "stderr: {err}");
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn repeated_identical_tool_call_stops_after_three() {
         .collect();
     let server = FakeLlm::start(replies);
 
-    let output = run_pirs(
+    let output = run_arqus(
         &project.path,
         &home.path,
         &server.url,
@@ -93,7 +93,7 @@ fn two_empty_assistant_replies_stop_the_turn() {
         Reply::sse(empty_reply()),
     ]);
 
-    let output = run_pirs(
+    let output = run_arqus(
         &project.path,
         &home.path,
         &server.url,
@@ -115,7 +115,7 @@ fn max_output_tokens_flag_is_sent_as_max_tokens() {
     let home = TempDir::new("max_tokens_home");
     let server = FakeLlm::start(vec![Reply::sse(sse_text(&["ok"]))]);
 
-    let output = run_pirs(
+    let output = run_arqus(
         &project.path,
         &home.path,
         &server.url,
@@ -130,15 +130,15 @@ fn max_output_tokens_flag_is_sent_as_max_tokens() {
 fn max_output_tokens_from_settings_is_sent_too() {
     let project = TempDir::new("max_tokens_settings");
     let home = TempDir::new("max_tokens_settings_home");
-    std::fs::create_dir_all(project.path.join(".pirs")).unwrap();
+    std::fs::create_dir_all(project.path.join(".arqus")).unwrap();
     std::fs::write(
-        project.path.join(".pirs/settings.json"),
+        project.path.join(".arqus/settings.json"),
         r#"{"limits":{"max_output_tokens":77}}"#,
     )
     .unwrap();
     let server = FakeLlm::start(vec![Reply::sse(sse_text(&["ok"]))]);
 
-    let output = run_pirs(
+    let output = run_arqus(
         &project.path,
         &home.path,
         &server.url,
@@ -155,7 +155,7 @@ fn print_mode_ends_with_the_summary_line() {
     let home = TempDir::new("summary_home");
     let server = FakeLlm::start(vec![Reply::sse(sse_text(&["hello"]))]);
 
-    let output = run_pirs(
+    let output = run_arqus(
         &project.path,
         &home.path,
         &server.url,
@@ -166,7 +166,7 @@ fn print_mode_ends_with_the_summary_line() {
     let err = stderr(&output);
     assert!(
         err.lines()
-            .any(|line| line.starts_with("[pirs] requests=1 in=100 out=20 cost=$0.0001 time=")),
+            .any(|line| line.starts_with("[arqus] requests=1 in=100 out=20 cost=$0.0001 time=")),
         "stderr: {err}"
     );
 }
@@ -180,10 +180,10 @@ fn cost_command_prints_the_session_totals() {
         Reply::sse(sse_text(&["second"])),
     ]);
 
-    let first = run_pirs(&project.path, &home.path, &server.url, &["-p", "hi"], &[]);
+    let first = run_arqus(&project.path, &home.path, &server.url, &["-p", "hi"], &[]);
     assert_eq!(first.status.code(), Some(0), "stderr: {}", stderr(&first));
 
-    let second = run_pirs(
+    let second = run_arqus(
         &project.path,
         &home.path,
         &server.url,
@@ -205,12 +205,12 @@ fn budget_prints_the_openrouter_key_numbers() {
     let body = r#"{"data":{"limit":20.0,"limit_remaining":12.5,"usage_daily":0.25}}"#;
     let server = FakeLlm::start(vec![Reply::status(200, body)]);
 
-    let output = run_pirs(
+    let output = run_arqus(
         &project.path,
         &home.path,
         &server.url,
         &["-p", "/budget"],
-        &[("PIRS_PROVIDER", "openrouter")],
+        &[("ARQUS_PROVIDER", "openrouter")],
     );
     assert_eq!(output.status.code(), Some(0), "stderr: {}", stderr(&output));
     assert!(
@@ -236,12 +236,12 @@ fn budget_failure_is_one_short_line() {
         r#"{"error":{"message":"bad key"}}"#,
     )]);
 
-    let output = run_pirs(
+    let output = run_arqus(
         &project.path,
         &home.path,
         &server.url,
         &["-p", "/budget"],
-        &[("PIRS_PROVIDER", "openrouter")],
+        &[("ARQUS_PROVIDER", "openrouter")],
     );
     assert_eq!(output.status.code(), Some(1), "stderr: {}", stderr(&output));
     assert!(

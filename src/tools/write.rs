@@ -68,7 +68,7 @@ fn temp_path(full: &Path) -> PathBuf {
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| "file".to_string());
     let n = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    dir.join(format!(".{name}.pirs-tmp-{}-{n}", std::process::id()))
+    dir.join(format!(".{name}.arqus-tmp-{}-{n}", std::process::id()))
 }
 
 #[cfg(test)]

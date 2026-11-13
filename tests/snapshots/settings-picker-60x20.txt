@@ -1,0 +1,20 @@
+
+
+    ┌ Settings · 1/7 ──────────────────────────────────┐
+    │ ›                                                │
+    │  Appearance                                      │
+    │   theme                                     dark │
+    │   show thinking                              off │
+    │   expand tool output                         off │
+    │  Behaviour                                       │
+    │   mouse capture                              off │
+    │   terminal bell                               on │
+    │   default mode                               ask │
+    │   compaction                                  on │
+    │                                                  │
+    │                                                  │
+    │                                                  │
+    │ ↑↓ select · enter change · esc close · mouse on: │
+    └──────────────────────────────────────────────────┘
+
+ …y-project  openrouter/deepseek/deepseek-v4-…  ctx 0%  ask

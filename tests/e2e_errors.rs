@@ -1,5 +1,5 @@
 //! Black-box tests for provider errors, retries, timeouts and exit codes.
-//! Every run uses the fake server, a temp project and a temp PIRS_HOME.
+//! Every run uses the fake server, a temp project and a temp ARQUS_HOME.
 
 mod support;
 use support::*;
@@ -46,7 +46,7 @@ fn rate_limited_then_success() {
         Reply::sse(sse_text(&["ok after retry"])),
     ]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -74,7 +74,7 @@ fn server_errors_twice_then_success() {
         Reply::sse(sse_text(&["finally"])),
     ]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -93,7 +93,7 @@ fn auth_error_exits_1_without_retry() {
     let home = TempDir::new("err_401_home");
     let fake = FakeLlm::start(vec![Reply::status(401, &error_body("bad key"))]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -117,7 +117,7 @@ fn payment_required_exits_1_without_retry() {
     let home = TempDir::new("err_402_home");
     let fake = FakeLlm::start(vec![Reply::status(402, &error_body("no credits"))]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -137,7 +137,7 @@ fn bad_request_exits_1_without_retry() {
     let home = TempDir::new("err_400_home");
     let fake = FakeLlm::start(vec![Reply::status(400, &error_body("model not found"))]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -157,12 +157,12 @@ fn connection_refused_exits_1() {
     let project = TempDir::new("err_refused_project");
     let home = TempDir::new("err_refused_home");
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         "http://127.0.0.1:1/v1",
         &["--no-session", "-p", "hi"],
-        &[("PIRS_MAX_RETRIES", "1")],
+        &[("ARQUS_MAX_RETRIES", "1")],
     );
 
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
@@ -179,12 +179,12 @@ fn idle_timeout_then_success() {
         Reply::sse(sse_text(&["awake"])),
     ]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
         &["--no-session", "-p", "hi"],
-        &[("PIRS_IDLE_TIMEOUT_SECS", "1")],
+        &[("ARQUS_IDLE_TIMEOUT_SECS", "1")],
     );
 
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
@@ -214,7 +214,7 @@ fn error_after_partial_text_is_not_retried() {
         sse_event(&error_chunk),
     ])]);
 
-    let out = run_pirs(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
+    let out = run_arqus(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
 
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     assert_eq!(
@@ -239,12 +239,12 @@ fn missing_key_exits_2() {
     let home = TempDir::new("err_nokey_home");
 
     // A remote host: a missing key is a configuration error there.
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         "https://api.example.invalid/v1",
         &["--no-session", "-p", "hi"],
-        &[("PIRS_API_KEY", "")],
+        &[("ARQUS_API_KEY", "")],
     );
 
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
@@ -257,12 +257,12 @@ fn empty_model_exits_2() {
     let home = TempDir::new("err_nomodel_home");
     let fake = FakeLlm::start(vec![]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
         &["--no-session", "-p", "hi"],
-        &[("PIRS_MODEL", "")],
+        &[("ARQUS_MODEL", "")],
     );
 
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
@@ -280,12 +280,12 @@ fn localhost_without_key_is_allowed() {
     let home = TempDir::new("err_local_home");
     let fake = FakeLlm::start(vec![Reply::sse(sse_text(&["local ok"]))]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
         &["--no-session", "-p", "hi"],
-        &[("PIRS_API_KEY", "")],
+        &[("ARQUS_API_KEY", "")],
     );
 
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
@@ -296,7 +296,7 @@ fn localhost_without_key_is_allowed() {
 fn context_overflow_compacts_then_retries() {
     let project = TempDir::new("err_overflow_project");
     let home = TempDir::new("err_overflow_home");
-    let settings = project.path.join(".pirs");
+    let settings = project.path.join(".arqus");
     fs::create_dir_all(&settings).expect("settings folder");
     fs::write(
         settings.join("settings.json"),
@@ -318,7 +318,7 @@ fn context_overflow_compacts_then_retries() {
     let first_prompt = "x".repeat(500);
     let second_prompt = "y".repeat(500);
 
-    let first = run_pirs(
+    let first = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -327,7 +327,7 @@ fn context_overflow_compacts_then_retries() {
     );
     assert_eq!(first.status.code(), Some(0), "stderr: {}", stderr(&first));
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,

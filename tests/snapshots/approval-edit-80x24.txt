@@ -1,0 +1,24 @@
+┃ change the build
+
+
+
+
+
+
+    ┌ Edit file? ──────────────────────────────────────────────────────────┐
+    │ path: src/main.rs                                                    │
+    │                                                                      │
+    │ --- old                                                              │
+    │ let answer = 41;                                                     │
+    │ +++ new                                                              │
+    │ let answer = 42;                                                     │
+    │                                                                      │
+    │ y allow once · a always allow edit · n deny · esc stop run           │
+    └──────────────────────────────────────────────────────────────────────┘
+
+ waiting for your approval
+ approval needed: edit
+┌ prompt ──────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+ /tmp                                        openrouter/test-model  ctx 0%  ask

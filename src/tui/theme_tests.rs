@@ -51,3 +51,35 @@ fn mono_has_no_colors() {
     assert_eq!(theme.error, Color::Reset);
     assert_eq!(theme.selection, Color::Reset);
 }
+
+#[test]
+fn drawing_sources_never_use_a_raw_color() {
+    let sources = [
+        ("view.rs", include_str!("view.rs")),
+        ("footer.rs", include_str!("footer.rs")),
+        ("welcome.rs", include_str!("welcome.rs")),
+        ("toast.rs", include_str!("toast.rs")),
+        ("running.rs", include_str!("running.rs")),
+        (
+            "widgets/picker_view.rs",
+            include_str!("widgets/picker_view.rs"),
+        ),
+        ("widgets/dialog.rs", include_str!("widgets/dialog.rs")),
+        (
+            "widgets/transcript.rs",
+            include_str!("widgets/transcript.rs"),
+        ),
+        ("widgets/tool_card.rs", include_str!("widgets/tool_card.rs")),
+        ("overlay/help.rs", include_str!("overlay/help.rs")),
+    ];
+    for (name, text) in sources {
+        assert!(
+            !text.contains("Color::Rgb("),
+            "{name} uses Color::Rgb; ask the theme instead"
+        );
+        assert!(
+            !text.contains("Color::Red"),
+            "{name} uses Color::Red; ask the theme instead"
+        );
+    }
+}

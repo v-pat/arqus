@@ -9,7 +9,7 @@ use super::openai;
 use super::{LlmError, LlmRequest, ModelConfig, RetrySettings, StreamEvent};
 
 pub const DEFAULT_BASE_URL: &str = "https://openrouter.ai/api/v1";
-pub const APP_TITLE: &str = "pirs";
+pub const APP_TITLE: &str = "arqus";
 
 /// OpenRouter uses `HTTP-Referer` and `X-Title` for app attribution.
 /// Both are optional; the title has a default so the app is identifiable.
@@ -26,10 +26,10 @@ pub fn headers_for(referer: Option<&str>, title: Option<&str>) -> Vec<(&'static 
     headers
 }
 
-/// Headers from the environment. `PIRS_HTTP_REFERER` is optional.
+/// Headers from the environment. `ARQUS_HTTP_REFERER` is optional.
 pub fn extra_headers() -> Vec<(&'static str, String)> {
-    let referer = std::env::var("PIRS_HTTP_REFERER").ok();
-    let title = std::env::var("PIRS_APP_TITLE").ok();
+    let referer = std::env::var("ARQUS_HTTP_REFERER").ok();
+    let title = std::env::var("ARQUS_APP_TITLE").ok();
     headers_for(referer.as_deref(), title.as_deref())
 }
 

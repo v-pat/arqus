@@ -179,7 +179,7 @@ fn summary_line_has_the_documented_shape() {
     };
     assert_eq!(
         summary_line(&totals, 12.34),
-        "[pirs] requests=3 in=1234 out=210 cost=$0.0042 time=12.3s"
+        "[arqus] requests=3 in=1234 out=210 cost=$0.0042 time=12.3s"
     );
     let unknown = Totals {
         cost: None,

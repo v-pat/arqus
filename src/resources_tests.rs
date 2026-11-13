@@ -2,7 +2,7 @@ use super::*;
 use crate::system_prompt::build_system_prompt;
 
 fn tmp() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("pirs_res_{}", uuid::Uuid::new_v4()));
+    let dir = std::env::temp_dir().join(format!("arqus_res_{}", uuid::Uuid::new_v4()));
     fs::create_dir_all(&dir).unwrap();
     dir
 }
@@ -50,8 +50,8 @@ fn claude_md_is_the_fallback() {
 fn system_md_replaces_and_append_adds() {
     let home = tmp();
     let project = tmp();
-    write(&project.join(".pirs/SYSTEM.md"), "CUSTOM PERSONA");
-    write(&project.join(".pirs/APPEND_SYSTEM.md"), "EXTRA RULES");
+    write(&project.join(".arqus/SYSTEM.md"), "CUSTOM PERSONA");
+    write(&project.join(".arqus/APPEND_SYSTEM.md"), "EXTRA RULES");
     write(&home.join("SYSTEM.md"), "GLOBAL PERSONA");
 
     let res = load_in(&home, &project);
@@ -83,7 +83,7 @@ fn project_skill_overrides_global_skill() {
         "---\nname: demo\ndescription: global demo\n---\n\nglobal body\n",
     );
     write(
-        &project.join(".pirs/skills/demo/SKILL.md"),
+        &project.join(".arqus/skills/demo/SKILL.md"),
         "---\nname: demo\ndescription: project demo\n---\n\n# Demo\n\nproject body\n",
     );
     write(
@@ -179,7 +179,7 @@ fn prompt_slash_command_replaces_arguments() {
     let home = tmp();
     let project = tmp();
     write(
-        &project.join(".pirs/prompts/review.md"),
+        &project.join(".arqus/prompts/review.md"),
         "Review this: $ARGUMENTS\nThanks.",
     );
     write(&home.join("prompts/global.md"), "Global: $ARGUMENTS");
@@ -229,7 +229,7 @@ fn empty_skills_folder_is_not_an_error() {
     let home = tmp();
     let project = tmp();
     fs::create_dir_all(home.join("skills")).unwrap();
-    fs::create_dir_all(project.join(".pirs/skills")).unwrap();
+    fs::create_dir_all(project.join(".arqus/skills")).unwrap();
 
     let res = load_in(&home, &project);
     assert!(res.skills.is_empty());
@@ -240,7 +240,7 @@ fn empty_skills_folder_is_not_an_error() {
 fn prompt_template_with_a_bad_name_never_crashes() {
     let home = tmp();
     let project = tmp();
-    write(&project.join(".pirs/prompts/bad name!.md"), "never loaded");
+    write(&project.join(".arqus/prompts/bad name!.md"), "never loaded");
 
     let res = load_in(&home, &project);
     assert_eq!(expand_input(&res, "/bad name!"), "/bad name!");

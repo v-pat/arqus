@@ -37,7 +37,7 @@ fn print_mode_asks_before_writing() {
         Reply::sse(sse_text(&["cannot write"])),
     ]);
 
-    let out = run_pirs_without_yolo(
+    let out = run_arqus_without_yolo(
         &project.path,
         &home.path,
         &fake.url,
@@ -54,7 +54,7 @@ fn print_mode_asks_before_writing() {
     assert_eq!(requests.len(), 2, "the model must see the refusal");
     let text = tool_result_text(&requests[1].body);
     assert!(
-        text.contains("Approval required. Run pirs with --yolo to allow this."),
+        text.contains("Approval required. Run arqus with --yolo to allow this."),
         "tool result: {text}"
     );
 }
@@ -73,7 +73,7 @@ fn read_never_asks_for_approval() {
         Reply::sse(sse_text(&["read it"])),
     ]);
 
-    let out = run_pirs_without_yolo(
+    let out = run_arqus_without_yolo(
         &project.path,
         &home.path,
         &fake.url,
@@ -103,7 +103,7 @@ fn write_outside_the_project_is_refused_even_with_yolo() {
         Reply::sse(sse_text(&["blocked"])),
     ]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project,
         &home.path,
         &fake.url,
@@ -137,7 +137,7 @@ fn risky_bash_is_refused_in_auto_mode_without_allow_risky() {
         Reply::sse(sse_text(&["blocked"])),
     ]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,

@@ -3,7 +3,7 @@ use super::*;
 use std::io::Read;
 
 fn tmp() -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("pirs_debug_{}", uuid::Uuid::new_v4()));
+    let dir = std::env::temp_dir().join(format!("arqus_debug_{}", uuid::Uuid::new_v4()));
     fs::create_dir_all(&dir).unwrap();
     dir
 }
@@ -15,8 +15,8 @@ fn fake_key() -> String {
 
 #[test]
 fn redact_removes_the_configured_key() {
-    let previous = std::env::var("PIRS_API_KEY").ok();
-    std::env::set_var("PIRS_API_KEY", "secret-key-12345");
+    let previous = std::env::var("ARQUS_API_KEY").ok();
+    std::env::set_var("ARQUS_API_KEY", "secret-key-12345");
 
     let got = redact("Authorization: Bearer secret-key-12345");
     assert_eq!(got, "Authorization: Bearer [REDACTED]");
@@ -24,8 +24,8 @@ fn redact_removes_the_configured_key() {
     assert_eq!(redact_with("abc abc", "abc"), "abc abc");
 
     match previous {
-        Some(value) => std::env::set_var("PIRS_API_KEY", value),
-        None => std::env::remove_var("PIRS_API_KEY"),
+        Some(value) => std::env::set_var("ARQUS_API_KEY", value),
+        None => std::env::remove_var("ARQUS_API_KEY"),
     }
 }
 

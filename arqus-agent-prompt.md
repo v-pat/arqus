@@ -1,19 +1,19 @@
-# pirs: build a pi-style coding agent in Rust (prompt kit for a small model)
+# arqus: build a pi-style coding agent in Rust (prompt kit for a small model)
 
-This file drives opencode (DeepSeek V4 Flash Free, or any similar small model) through building `pirs`, a minimal terminal coding agent modeled on pi (pi.dev, github.com/badlogic/pi-mono).
+This file drives opencode (DeepSeek V4 Flash Free, or any similar small model) through building `arqus`, a minimal terminal coding agent modeled on pi (pi.dev, github.com/badlogic/pi-mono).
 
 - **Part A** is the permanent brief. Copy it into `AGENTS.md`.
 - **Part B** has one prompt per stage. Paste them one at a time, each in a fresh opencode session.
 - **Part C** is the roadmap: what "like pi" means and what to skip.
 - **Part D** is rescue tips for when the small model gets lost.
 
-`pirs-starter.zip` (delivered with this file) holds tested Rust code for the core of stages 1 to 3 and part of stage 7. Using it is optional, but it gives you a green `cargo test` on day one.
+`arqus-starter.zip` (delivered with this file) holds tested Rust code for the core of stages 1 to 3 and part of stage 7. Using it is optional, but it gives you a green `cargo test` on day one.
 
 ---
 
 ## How to use this (for you, the human)
 
-1. Recommended: unzip `pirs-starter.zip` into a new empty folder named `pirs`, then `cd pirs && git init && cargo test` and expect 9 passed. (Alternative for a blank start: `cargo new pirs`.)
+1. Recommended: unzip `arqus-starter.zip` into a new empty folder named `arqus`, then `cd arqus && git init && cargo test` and expect 9 passed. (Alternative for a blank start: `cargo new arqus`.)
 2. Copy everything in **Part A** (from "# PART A" to the line before "# PART B") into a file called `AGENTS.md` in the project root. opencode reads it at the start of every session. Create an empty `PROGRESS.md`.
 3. Open a NEW opencode session for each stage. Paste the **PREFIX** line, then the stage text. A fresh session keeps the small model's context clean.
 4. A stage is finished only when its DONE WHEN commands really pass. Then `git add -A && git commit -m "stage N"`.
@@ -26,7 +26,7 @@ This file drives opencode (DeepSeek V4 Flash Free, or any similar small model) t
 
 ## A1. Mission
 
-We are building `pirs`: a minimal terminal coding agent in Rust, modeled on **pi**.
+We are building `arqus`: a minimal terminal coding agent in Rust, modeled on **pi**.
 
 What pi is (facts to copy as ideas, never copy its source or its prompts):
 - Tiny core. System prompt under about 1000 tokens. Four tools: `read`, `write`, `edit`, `bash`. Everything else is optional.
@@ -217,7 +217,7 @@ This format is inspired by pi's but is our own and is not byte-compatible with i
 
 ## A8. The pi ideas we implement (design decisions)
 
-1. **Session = JSONL, append only.** One header line, then one entry per line. Each entry has `id` and `parent_id`. The leaf is the LAST line of the file. To branch, move the in-memory leaf to an older id and append: the new entry becomes the last line, so the branch persists. History is never deleted, even after compaction. Session files live in `~/.pirs/sessions/<project-slug>/<ts>_<id>.jsonl`, where the slug is the cwd with `/` and `.` replaced by `-`.
+1. **Session = JSONL, append only.** One header line, then one entry per line. Each entry has `id` and `parent_id`. The leaf is the LAST line of the file. To branch, move the in-memory leaf to an older id and append: the new entry becomes the last line, so the branch persists. History is never deleted, even after compaction. Session files live in `~/.arqus/sessions/<project-slug>/<ts>_<id>.jsonl`, where the slug is the cwd with `/` and `.` replaced by `-`.
 2. **Context is a pure function.** `build_context(entries, leaf) -> Vec<Message>`: walk from the leaf to the root, reverse, apply the latest compaction (summary message plus kept messages), turn `branch_summary` entries into user messages, skip `model_change` and `custom` entries, then `sanitize`. Nothing else is allowed to decide what the model sees.
 3. **Sanitize rules.** Every tool call must be followed by its tool result. A missing result gets a synthetic error result ("interrupted"). A result without a call is dropped. An assistant message that failed or was aborted and has no content is dropped.
 4. **Adapters convert at the edge.** The neutral `Message` is converted to a provider's wire format only inside `ai/`. Adapters own provider quirks: tool-call id rules, thinking blocks, merging tool results. This is what lets one session contain messages from many providers.
@@ -283,11 +283,11 @@ Copy each stage from its "PASTE" line down to the next `---`.
 PASTE:
 Goal: the project compiles with empty modules.
 Do:
-1. If `Cargo.toml` does not exist, run `cargo init --name pirs` in the current folder.
+1. If `Cargo.toml` does not exist, run `cargo init --name arqus` in the current folder.
 2. Add crates for stages 1 to 3 only: `cargo add serde --features derive`, `cargo add serde_json anyhow dirs`, `cargo add uuid --features v4`.
 3. Create empty files `src/types.rs`, `src/session.rs`, `src/context.rs`, `src/compaction.rs`, `src/system_prompt.rs` and declare them with `mod` in `src/main.rs`. Skip any that already exist.
 4. Make sure `.gitignore` contains `/target`. Create `PROGRESS.md` if missing.
-Done when: `cargo check` succeeds and `cargo run` prints a line containing "pirs".
+Done when: `cargo check` succeeds and `cargo run` prints a line containing "arqus".
 
 ---
 
@@ -311,7 +311,7 @@ PASTE:
 Goal: write `src/session.rs`, the JSONL store with a parent_id tree. If it already exists (from the starter), read it, explain it, and only add what is missing.
 Required items:
 - `now_ms()`, `new_id()` (8 characters), `project_slug(cwd)` (replace `/` and `.` with `-`).
-- `sessions_dir(cwd) -> PathBuf` = `~/.pirs/sessions/<slug>/` using the `dirs` crate.
+- `sessions_dir(cwd) -> PathBuf` = `~/.arqus/sessions/<slug>/` using the `dirs` crate.
 - `latest_session(dir) -> Option<PathBuf>`: newest `.jsonl` file by name or modified time (for "continue last session").
 - `struct Session { path, header, entries, leaf_id }` with `create(dir, cwd)`, `open(path)`, `append(kind) -> id`, `set_leaf(id)`.
 - `path_to_root(entries, leaf) -> Vec<&Entry>` ordered root to leaf.
@@ -324,7 +324,7 @@ Tests (all with temp folders):
 5. `project_slug("/home/me/my.proj")` is `-home-me-my-proj`.
 6. `latest_session` returns the newest of two files.
 Done when: all session tests pass.
-Don't: write to the real `~/.pirs` in tests.
+Don't: write to the real `~/.arqus` in tests.
 
 ---
 
@@ -341,7 +341,7 @@ Tests (each builds entries in memory or with a temp session):
 5. with a compaction entry: summary message first, old messages gone, kept and later messages present.
 6. an aborted assistant message with no blocks is dropped.
 System prompt: `build_system_prompt(cwd: &str, date: &str) -> String`. For now, a constant base prompt under 250 words, then the cwd and date. Use this text, with the last two lines filled in:
-   You are pirs, a coding assistant running in the user's terminal. You help by reading files, running commands, editing code and writing files.
+   You are arqus, a coding assistant running in the user's terminal. You help by reading files, running commands, editing code and writing files.
    Tools: read, write, edit, bash (see each tool's description).
    - Look before you change: read a file before you edit it.
    - Prefer edit (small exact replacements) over write for existing files.
@@ -364,7 +364,7 @@ First run: `cargo add tokio --features full`, `cargo add reqwest --features json
 In `src/ai/mod.rs` define:
 - `ToolDef { name: String, description: String, parameters: serde_json::Value }` (parameters is a JSON schema).
 - `LlmRequest { system: String, messages: Vec<Message>, tools: Vec<ToolDef>, max_tokens: Option<u32> }`.
-- `ModelConfig { provider: String, model: String, base_url: String, api_key: String, context_window: u64 }`. Fill it from env vars `PIRS_BASE_URL`, `PIRS_API_KEY`, `PIRS_MODEL`, `PIRS_CONTEXT_WINDOW` (default 128000). Never log the key.
+- `ModelConfig { provider: String, model: String, base_url: String, api_key: String, context_window: u64 }`. Fill it from env vars `ARQUS_BASE_URL`, `ARQUS_API_KEY`, `ARQUS_MODEL`, `ARQUS_CONTEXT_WINDOW` (default 128000). Never log the key.
 - `StreamEvent { TextDelta(String), ThinkingDelta(String), ToolCall { id, name, args }, Done(Message), Error(String) }`. A `ToolCall` event is sent only when that call is complete (collect argument fragments inside the adapter). `Done` carries the final `Message::Assistant` with blocks, usage and stop reason.
 - `enum Llm { OpenAi(ModelConfig), Mock(Arc<Mutex<VecDeque<Vec<StreamEvent>>>>) }` with `async fn stream(&self, req: LlmRequest, tx: tokio::sync::mpsc::Sender<StreamEvent>) -> anyhow::Result<()>`. Rust note: why `Arc<Mutex<..>>` (shared mutable state), explained in 3 lines.
 `ai/mock.rs`: each call to `stream` pops the next scripted list of events and sends them.
@@ -374,7 +374,7 @@ In `src/ai/mod.rs` define:
 - Parse the SSE stream: read `bytes_stream()`, split into lines, handle lines starting with `data: `, stop at `data: [DONE]`. Put the line parsing in a PURE function that is unit tested.
 - Map `delta.content` to `TextDelta`. Map `delta.reasoning_content` (or `delta.reasoning`) to `ThinkingDelta`. Collect `delta.tool_calls[i]` fragments by `index` (the id and name arrive first, the arguments arrive in pieces; parse the joined string as JSON at the end; if parsing fails, send an `Error`). Map `finish_reason`: `stop` is `Stop`, `tool_calls` is `ToolUse`, `length` is `Length`. Read `usage.prompt_tokens` as input and `usage.completion_tokens` as output.
 - Known quirk: some reasoning models return a 400 error about `reasoning_content` when you send an assistant turn back without it. If that happens, keep the thinking text and send it as a `reasoning_content` field on that assistant message. Do this ONLY inside this adapter.
-Add a temporary CLI command `pirs llm-test "your prompt"` that streams the answer to stdout (use a plain `std::env::args`; clap comes in stage 6).
+Add a temporary CLI command `arqus llm-test "your prompt"` that streams the answer to stdout (use a plain `std::env::args`; clap comes in stage 6).
 Tests: (a) the SSE line parser, with canned chunks for text, for a tool call split across 3 chunks, and for the usage chunk; (b) the message conversion function (neutral to OpenAI JSON) compared against expected JSON; (c) the mock provider returns its scripted events in order.
 Done when: `cargo test` passes. Manual check by the human (not by you): set the 3 env vars and run `cargo run -- llm-test "say hi"`.
 Don't: implement Anthropic yet. Don't import `session` anywhere under `ai/`.
@@ -404,7 +404,7 @@ Don't: import `session` or `agent`. Don't add grep, find or ls tools (bash cover
 ## STAGE 6: Agent loop + print mode (first full end-to-end)
 
 PASTE:
-Goal: a working agent: `pirs -p "do something"`. This is the first big milestone.
+Goal: a working agent: `arqus -p "do something"`. This is the first big milestone.
 First run: `cargo add clap --features derive`.
 `src/agent.rs`:
 - `enum AgentEvent { TextDelta(String), ThinkingDelta(String), ToolStart { name: String, args: serde_json::Value }, ToolEnd { name: String, text: String, is_error: bool }, TurnDone, Error(String) }`.
@@ -412,12 +412,12 @@ First run: `cargo add clap --features derive`.
 - `async fn run_prompt(session: &mut Session, llm: &Llm, cfg: &AgentConfig, user_text: String, events: Sender<AgentEvent>) -> anyhow::Result<()>` following AGENTS.md A9. Leave a `// TODO stage 7: compaction check` comment where the compaction step goes.
 - If the stream ends with `Error`, save an assistant message with `stop: Error` and finish the turn (the next `build_context` will drop it if it is empty).
 - A safety limit of 50 rounds per prompt.
-`main.rs` with clap: `pirs -p "<prompt>"` (print mode), `-c` (continue the latest session for this cwd), `--no-session` (use a temp session). Print mode writes the assistant text to stdout as it streams, and prints tool calls and results to stderr in short form (one line each, results cut to 200 characters).
+`main.rs` with clap: `arqus -p "<prompt>"` (print mode), `-c` (continue the latest session for this cwd), `--no-session` (use a temp session). Print mode writes the assistant text to stdout as it streams, and prints tool calls and results to stderr in short form (one line each, results cut to 200 characters).
 Tests (use the mock provider, no network):
 1. Script: first response = a `bash` tool call (`echo hi`), second response = final text. Run `run_prompt` on a temp session. Assert that the session entries are, in order: user, assistant (tool call), tool_result (text contains "hi"), assistant (text).
 2. An unknown tool name produces an error tool_result and the loop continues.
 3. A provider `Error` ends the turn without a panic.
-Done when: the tests pass AND the human can run `pirs -p "list the files in this folder"` against a real endpoint and see it call bash.
+Done when: the tests pass AND the human can run `arqus -p "list the files in this folder"` against a real endpoint and see it call bash.
 Don't: build compaction or a TUI yet.
 
 ---
@@ -435,7 +435,7 @@ Add to `compaction.rs`:
 Wire it into `agent.rs`:
 - After each assistant message, compute context tokens (the last assistant `usage.total()` if present, otherwise the sum of `estimate_tokens`). If `should_compact(...)`, call `compact`, and send a new `AgentEvent::Compacted` variant (add it to the enum).
 - Overflow recovery: if the LLM returns an error that looks like a context-length error (message contains "context" and "length" or "token", or HTTP 400/413), compact once and retry the request once. Use a flag so it can only happen once per prompt.
-- Manual: `pirs -p "/compact optional focus text"` runs `compact` with the text as custom instructions.
+- Manual: `arqus -p "/compact optional focus text"` runs `compact` with the text as custom instructions.
 Known limit (write it as a TODO): if the cut lands in the middle of a very long turn, pi writes a separate "turn prefix" summary. We skip that for now.
 Tests (mock provider, tiny settings such as keep_recent 100 and reserve near the window): a long fake history triggers compaction; the new entry exists; `build_context` after it is shorter and its first message contains the mock summary text; running twice sends the previous summary into the second summary call; `extract_file_ops` gives correct lists.
 Done when: all compaction tests pass.
@@ -447,9 +447,9 @@ Done when: all compaction tests pass.
 PASTE:
 Goal: `src/resources.rs`, the customization layer, and extend `system_prompt.rs`.
 Rules:
-1. **AGENTS.md.** Load, in this order: `~/.pirs/AGENTS.md`, then each parent folder from the filesystem root down to `cwd`. In each folder use `AGENTS.md`, or `CLAUDE.md` if there is no AGENTS.md. Put them in the system prompt as `<project-context path="...">...</project-context>` blocks, outermost first.
-2. **SYSTEM.md.** If `<cwd>/.pirs/SYSTEM.md` exists, it REPLACES the base prompt. Else if `~/.pirs/SYSTEM.md` exists, it replaces it. `APPEND_SYSTEM.md` (same two places) is added after the base prompt.
-3. **Skills.** A skill is a folder containing `SKILL.md`. Search `~/.pirs/skills/*/SKILL.md` and `<cwd>/.pirs/skills/*/SKILL.md` (the project one wins when names collide). `SKILL.md` starts with frontmatter:
+1. **AGENTS.md.** Load, in this order: `~/.arqus/AGENTS.md`, then each parent folder from the filesystem root down to `cwd`. In each folder use `AGENTS.md`, or `CLAUDE.md` if there is no AGENTS.md. Put them in the system prompt as `<project-context path="...">...</project-context>` blocks, outermost first.
+2. **SYSTEM.md.** If `<cwd>/.arqus/SYSTEM.md` exists, it REPLACES the base prompt. Else if `~/.arqus/SYSTEM.md` exists, it replaces it. `APPEND_SYSTEM.md` (same two places) is added after the base prompt.
+3. **Skills.** A skill is a folder containing `SKILL.md`. Search `~/.arqus/skills/*/SKILL.md` and `<cwd>/.arqus/skills/*/SKILL.md` (the project one wins when names collide). `SKILL.md` starts with frontmatter:
 ```
 ---
 name: my-skill
@@ -463,10 +463,10 @@ description: one or two sentences saying WHEN to use it
 </available_skills>
 When a task matches a skill's description, first read that SKILL.md with the read tool, then follow it. Paths inside a skill are relative to the skill's folder.
 ```
-4. **Slash commands in user input.** `/skill:name rest of text` becomes a user message containing the full text of that skill's SKILL.md, then the rest of the text. `/name rest` where `~/.pirs/prompts/name.md` or `<cwd>/.pirs/prompts/name.md` exists becomes the file content with `$ARGUMENTS` replaced by `rest`. Unknown slash words are passed through unchanged.
+4. **Slash commands in user input.** `/skill:name rest of text` becomes a user message containing the full text of that skill's SKILL.md, then the rest of the text. `/name rest` where `~/.arqus/prompts/name.md` or `<cwd>/.arqus/prompts/name.md` exists becomes the file content with `$ARGUMENTS` replaced by `rest`. Unknown slash words are passed through unchanged.
 5. `build_system_prompt` now takes the loaded resources and assembles: base (or replacement) + append + AGENTS blocks + skills block + cwd and date.
 Tests with temp folder trees: nested AGENTS.md order; CLAUDE.md fallback; SYSTEM.md replace and APPEND; skill parsing and project override; broken skill is skipped; both slash expansions; unknown slash word unchanged.
-Done when: tests pass, and `pirs -p "which skills do you have?"` run in a folder with one skill lists it.
+Done when: tests pass, and `arqus -p "which skills do you have?"` run in a folder with one skill lists it.
 Strategy note to include at the top of `resources.rs` as a comment (for the human):
 - AGENTS.md: short, stable project facts: how to build, test and run; code style; folder map. Under about 100 lines, because it is sent on EVERY request.
 - SYSTEM.md: only when you want a different persona or rules. It REPLACES the base prompt, so use APPEND_SYSTEM.md for small additions.
@@ -518,7 +518,7 @@ Done when: tests pass and the human confirms a live Anthropic call (they need a 
 
 PASTE:
 Goal: only ONE item per session; the human will say which.
-- `~/.pirs/settings.json` and `<cwd>/.pirs/settings.json` (project overrides global): default model, base url, compaction numbers, skill folders. Environment variables still win.
+- `~/.arqus/settings.json` and `<cwd>/.arqus/settings.json` (project overrides global): default model, base url, compaction numbers, skill folders. Environment variables still win.
 - Steering queue: while the agent is running, text typed by the user is queued and delivered after the current tool results, before the next LLM call.
 - Session names (`/name`), a better `/resume` picker, token and cost display in the status bar.
 - Keep the thinking-block `signature` for Anthropic extended thinking: add `signature: Option<String>` to `Block::Thinking` and send it back on the same provider only.
@@ -535,16 +535,16 @@ Do not start "extensions" here. See Part C.
 | Milestone | Stages | You can say |
 |---|---|---|
 | M1: the brain | 0 to 3 | "I can load a JSONL tree and build correct LLM context from any leaf." (tests only, no AI yet) |
-| M2: the first agent | 4 to 6 | "`pirs -p` edits files by itself." Real end-to-end. |
+| M2: the first agent | 4 to 6 | "`arqus -p` edits files by itself." Real end-to-end. |
 | M3: long sessions | 7 to 8 | "It survives long work and reads my AGENTS.md and skills." |
 | M4: daily driver | 9 to 10 | "TUI, multiple providers, branching." |
 | M5: pi-like extras | 11 and beyond | Settings, steering, extensions. |
 
 **Why this order.** The types and context builder do not need a network or a UI, so the small model can finish them with simple unit tests. Everything after them depends on those types, so fixing them first prevents rewrites. The TUI comes late because print mode proves the core without terminal complexity.
 
-**Use pirs to build pirs.** After M2, try giving small tasks to `pirs` itself with the same model. It will find the weak spots in your tools and your prompts quickly.
+**Use arqus to build arqus.** After M2, try giving small tasks to `arqus` itself with the same model. It will find the weak spots in your tools and your prompts quickly.
 
-**Deliberately NOT copied from pi (yet).** Pi's extension system (TypeScript loaded at runtime), packages, themes, OAuth logins, HTML export, RPC mode. When you reach this, the simplest Rust-friendly design is: an extension is an external program that talks JSON over stdin/stdout, which pirs starts and calls (tools, slash commands, hooks like "before compaction"). Embedded scripting or WASM exist but are much harder.
+**Deliberately NOT copied from pi (yet).** Pi's extension system (TypeScript loaded at runtime), packages, themes, OAuth logins, HTML export, RPC mode. When you reach this, the simplest Rust-friendly design is: an extension is an external program that talks JSON over stdin/stdout, which arqus starts and calls (tools, slash commands, hooks like "before compaction"). Embedded scripting or WASM exist but are much harder.
 
 **Facts to remember about pi's compaction numbers.** The defaults I used (reserve 16384, keep 20000, summary sections, file lists appended by code) come from a third-party analysis of pi's source from March 2026. Pi may have changed them since. They are good starting values, not a spec.
 

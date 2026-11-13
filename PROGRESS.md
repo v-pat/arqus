@@ -2,10 +2,10 @@
 - Files created or changed:
   - `Cargo.toml` (added `dirs`; already had `serde`, `serde_json`, `anyhow`, `uuid`)
   - `src/system_prompt.rs` (new stub module)
-  - `src/main.rs` (declared `mod system_prompt`, prints `pirs <version>`)
+  - `src/main.rs` (declared `mod system_prompt`, prints `arqus <version>`)
   - `PROGRESS.md` (this block)
 - What works (command + short real output):
-  - `cargo run` -> `pirs 0.1.0`
+  - `cargo run` -> `arqus 0.1.0`
   - `cargo test` -> `test result: ok. 9 passed; 0 failed`
 - Assumptions:
   - `src/types.rs`, `src/session.rs`, `src/context.rs`, `src/compaction.rs` already existed and work, so they were skipped, not rewritten.
@@ -72,14 +72,14 @@
   - `src/ai/sse.rs` (new): pure `StreamParser` with `feed_line`, `feed_data`, `finish`.
   - `src/ai/sse_tests.rs` (new): parser tests, split out to keep `sse.rs` under 300 lines.
   - `src/ai/openai.rs` (new): `convert_messages`, `build_body`, streaming HTTP client.
-  - `src/main.rs`: temporary `pirs llm-test "<prompt>"`.
+  - `src/main.rs`: temporary `arqus llm-test "<prompt>"`.
   - `PROGRESS.md` (this block)
 - What works (command + short real output):
   - `cargo test` -> `test result: ok. 44 passed; 0 failed`
   - `cargo clippy --all-targets` -> no warnings
   - `cargo run -- llm-test` with no env -> `error: provider returned 401 Unauthorized: {"error":{"message":"Missing Authentication header","code":401}}` (request reached the endpoint; no key printed)
 - Assumptions:
-  - `provider` comes from optional `PIRS_PROVIDER`, default `openai`. `base_url` default is `https://openrouter.ai/api/v1`; the four required vars still override it.
+  - `provider` comes from optional `ARQUS_PROVIDER`, default `openai`. `base_url` default is `https://openrouter.ai/api/v1`; the four required vars still override it.
   - `ModelConfig` implements `Debug` by hand and prints `api_key: "<redacted>"`, so the derived rule from A4 is intentionally broken for this one type.
   - `ToolCall` events are emitted in `finish()`, after the stream ends, because the usage chunk arrives after `finish_reason` and the arguments are only complete then.
   - Assistant messages send `content: ""` and omit `tool_calls` when there are none. `Thinking` blocks become a `reasoning_content` field on the assistant message (the adapter-only quirk).
@@ -115,7 +115,7 @@
   - No approval mode; `// TODO: optional approval mode` marks the spot.
   - No `grep`, `find` or `ls` tools; `bash` covers them.
 - Next stage:
-  - Stage 6: agent loop and `pirs -p` print mode.
+  - Stage 6: agent loop and `arqus -p` print mode.
 ## Stage 6: Agent loop + print mode
 - Files:
 - Cargo.toml: added clap derive
@@ -125,7 +125,7 @@
 - What works:
 - cargo test -> 68 passed, 0 failed
 - cargo clippy --all-targets -> no warnings
-- pirs --help shows -p, -c, --no-session
+- arqus --help shows -p, -c, --no-session
 - Assumptions:
 - mock scripts put ToolCall blocks in Done
 - ToolCall stream events are ignored; Done wins
@@ -142,7 +142,7 @@
   - `src/compaction_tests.rs` (new): serializer, file ops, first/second compaction, custom focus, agent auto-compaction.
   - `src/ai/mod.rs`, `src/ai/mock.rs`: `Llm::MockCapture` records requests so tests can inspect the summary prompt.
   - `src/agent.rs`: `AgentEvent::Compacted`, `AgentConfig::compaction`, auto-compaction after each assistant turn, one-shot overflow recovery, `is_context_overflow`.
-  - `src/main.rs`: `pirs -p "/compact [focus]"` manual compaction, `Compacted` print event.
+  - `src/main.rs`: `arqus -p "/compact [focus]"` manual compaction, `Compacted` print event.
   - `PROGRESS.md` (this block)
 - What works (command + short real output):
   - `cargo test` -> `test result: ok. 75 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s`
@@ -171,13 +171,13 @@
   - `cargo test` -> `test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s`
   - `cargo clippy --all-targets` -> `Finished dev profile ...` with no warnings.
   - End-to-end with a local fake SSE provider and one project skill:
-    `PIRS_BASE_URL=http://127.0.0.1:8765/v1 PIRS_API_KEY=test PIRS_MODEL=fake pirs --no-session -p "which skills do you have?"`
+    `ARQUS_BASE_URL=http://127.0.0.1:8765/v1 ARQUS_API_KEY=test ARQUS_MODEL=fake arqus --no-session -p "which skills do you have?"`
     -> `You have the demo skill.`; server log: `skill_in_prompt=True`, `system_len=1025`.
 - Assumptions:
-  - AGENTS.md order: `~/.pirs/AGENTS.md`, then `<root>/AGENTS.md` ... `<cwd>/AGENTS.md`; `CLAUDE.md` is used when a folder has no `AGENTS.md`.
-  - `SYSTEM.md` and `APPEND_SYSTEM.md`: project `<cwd>/.pirs/` wins; global `~/.pirs/` is the fallback. APPEND is not concatenated from both places.
+  - AGENTS.md order: `~/.arqus/AGENTS.md`, then `<root>/AGENTS.md` ... `<cwd>/AGENTS.md`; `CLAUDE.md` is used when a folder has no `AGENTS.md`.
+  - `SYSTEM.md` and `APPEND_SYSTEM.md`: project `<cwd>/.arqus/` wins; global `~/.arqus/` is the fallback. APPEND is not concatenated from both places.
   - Skills are sorted by name (`BTreeMap`); project skill overrides global with the same name. Only `name` and `description` are parsed from frontmatter; extra keys are ignored.
-  - Prompt templates: project `<cwd>/.pirs/prompts/name.md` wins over `~/.pirs/prompts/name.md`. Slash names are limited to `[A-Za-z0-9_-]` to block path traversal.
+  - Prompt templates: project `<cwd>/.arqus/prompts/name.md` wins over `~/.arqus/prompts/name.md`. Slash names are limited to `[A-Za-z0-9_-]` to block path traversal.
   - `/compact` remains a built-in and is handled before template expansion. `/skill:name` inlines the whole SKILL.md and appends the rest of the input.
 - Known problems / TODO:
   - `build_system_prompt` has no byte cap; a very large AGENTS.md is sent on every request (the strategy note tells the human to keep it short).
@@ -201,7 +201,7 @@
 - What works (command + short real output):
   - `cargo test` -> `test result: ok. 98 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s`
   - `cargo clippy --all-targets` -> `Finished dev profile ...` with no warnings.
-  - Print mode against local Ollama: `PIRS_BASE_URL=http://127.0.0.1:11434/v1 PIRS_API_KEY=ollama PIRS_MODEL=qwen3:8b cargo run --quiet -- --no-session -p "Reply with exactly: hello from pirs"` -> `hello from pirs`
+  - Print mode against local Ollama: `ARQUS_BASE_URL=http://127.0.0.1:11434/v1 ARQUS_API_KEY=ollama ARQUS_MODEL=qwen3:8b cargo run --quiet -- --no-session -p "Reply with exactly: hello from arqus"` -> `hello from arqus`
   - PTY smoke test (100x30): streamed assistant text appeared, `-> bash` and `<- bash` rendered after a tool call, process exited 0, alt screen entered and left, no panic.
   - PTY abort test: prompt, then Esc -> `aborted` status, UI accepted another prompt, Ctrl+D -> exit 0, terminal restored.
 - Assumptions:
@@ -238,10 +238,10 @@
   - `cargo clippy --all-targets` -> `Finished dev profile ...` with no warnings.
   - `cargo run -- --help` shows `--model <PROVIDER:MODEL>`.
   - `cargo run --quiet -- --no-session -p "/fork"` -> `forked to /var/folders/.../1793991301549_5d9be85d.jsonl`
-  - Live Anthropic call skipped: neither `PIRS_API_KEY` nor `ANTHROPIC_API_KEY` is set.
+  - Live Anthropic call skipped: neither `ARQUS_API_KEY` nor `ANTHROPIC_API_KEY` is set.
 - Assumptions:
-  - `PIRS_API_KEY` is the key for every provider, including Anthropic. `PIRS_BASE_URL` still overrides the default `https://api.anthropic.com/v1`.
-  - Missing `PIRS_CONTEXT_WINDOW` defaults to 200000 for Anthropic and 128000 for other providers.
+  - `ARQUS_API_KEY` is the key for every provider, including Anthropic. `ARQUS_BASE_URL` still overrides the default `https://api.anthropic.com/v1`.
+  - Missing `ARQUS_CONTEXT_WINDOW` defaults to 200000 for Anthropic and 128000 for other providers.
   - Anthropic tool ids are sanitized by replacing every illegal character with `_` and truncating to 64 characters; the matching result uses the same function, so ids agree.
   - A thinking-only assistant message is skipped during Anthropic conversion because Anthropic rejects empty content. Thinking blocks are dropped as the brief asks.
   - Tool results are sent as a user message with an array of `tool_result` blocks; consecutive results merge into one message.
@@ -268,7 +268,7 @@
   - `cargo clippy --all-targets` -> no warnings.
 - Assumptions:
   - OpenRouter speaks the OpenAI chat/completions format, so it reuses the OpenAI converter and SSE parser instead of duplicating them.
-  - `X-Title` defaults to `pirs`; `PIRS_APP_TITLE` overrides it. `HTTP-Referer` is sent only when `PIRS_HTTP_REFERER` is set.
+  - `X-Title` defaults to `arqus`; `ARQUS_APP_TITLE` overrides it. `HTTP-Referer` is sent only when `ARQUS_HTTP_REFERER` is set.
   - `--model openrouter:<model>` selects the dedicated adapter. Unknown provider names still use the generic OpenAI adapter.
   - Default base URL for OpenRouter, OpenAI and local compatible servers remains `https://openrouter.ai/api/v1`.
 - Known problems / TODO:
@@ -289,9 +289,9 @@
   - `cargo test` -> `test result: ok. 127 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s`
   - `cargo clippy --all-targets` -> `Finished dev profile ...` with no warnings.
   - Bad settings model in a temp cwd: `{"model":"no-colon"}` -> `error: model must look like provider:model, got "no-colon"` and exit 1.
-  - Valid settings model in a temp cwd: `{"model":"anthropic:fake-model"}` -> `pirs --no-session -p "/tree"` exits 0.
+  - Valid settings model in a temp cwd: `{"model":"anthropic:fake-model"}` -> `arqus --no-session -p "/tree"` exits 0.
 - Assumptions:
-  - Precedence: CLI `--model`, then `PIRS_*` environment variables, then project settings, then global settings, then built-in defaults. `PIRS_API_KEY` is the only key source; settings never store it.
+  - Precedence: CLI `--model`, then `ARQUS_*` environment variables, then project settings, then global settings, then built-in defaults. `ARQUS_API_KEY` is the only key source; settings never store it.
   - Settings `model` uses the same `provider:model` shape as `--model`, so `provider` and `model` resolve together (a CLI flag replaces both).
   - `skill_folders` from both files accumulate: global folders first, then project ones. A later folder wins on a skill name clash, same rule as project over project-global skills.
   - A missing settings file is silent. A broken one prints `warning: ignoring <path>: ...` and the other file is still used.
@@ -303,38 +303,38 @@
 - Next stage:
   - No stage defined after 11. Remaining polish items: steering queue, session names, Anthropic thinking signatures, split-turn compaction, markdown rendering.
 
-## Stage 12: PIRS_HOME and the debug log   [DONE]
+## Stage 12: ARQUS_HOME and the debug log   [DONE]
 - Files created or changed:
-  - `src/home.rs` (new): `pirs_home()` and pure `pirs_home_from(Option<&str>)`.
-  - `src/home_tests.rs` (new): env value wins, empty value falls back, one test sets and restores `PIRS_HOME`.
+  - `src/home.rs` (new): `arqus_home()` and pure `arqus_home_from(Option<&str>)`.
+  - `src/home_tests.rs` (new): env value wins, empty value falls back, one test sets and restores `ARQUS_HOME`.
   - `src/debug.rs` (new): `init`, `env_on`, `log`, `redact`/`redact_with`, `open_log`, `append_line`, `render`, 5 MB rotation to `debug.log.1`.
   - `src/debug_tests.rs` (new): exact key, `sk-test123`, clean text, debug off creates no file, debug on writes 5 parseable JSON lines with no key.
-  - `src/session.rs`: `sessions_dir` uses `pirs_home()`.
-  - `src/settings.rs`: `Settings::load` uses `pirs_home()`; `load_in` now takes the pirs home itself (`home/settings.json`).
-  - `src/resources.rs`: `load`/`load_with` use `pirs_home()`; `load_in`/`load_in_with` take the pirs home itself; global SYSTEM/APPEND/AGENTS/skills/prompts read from it directly.
-  - `src/resources_tests.rs`, `src/settings_tests.rs`: temp `home` is now the pirs home, so `.pirs/` was removed from those paths.
+  - `src/session.rs`: `sessions_dir` uses `arqus_home()`.
+  - `src/settings.rs`: `Settings::load` uses `arqus_home()`; `load_in` now takes the arqus home itself (`home/settings.json`).
+  - `src/resources.rs`: `load`/`load_with` use `arqus_home()`; `load_in`/`load_in_with` take the arqus home itself; global SYSTEM/APPEND/AGENTS/skills/prompts read from it directly.
+  - `src/resources_tests.rs`, `src/settings_tests.rs`: temp `home` is now the arqus home, so `.arqus/` was removed from those paths.
   - `src/ai/openai.rs`, `src/ai/anthropic.rs`: log `request` (url + body), `status` (code), every raw `sse` line, and `error` text. Headers are never logged.
   - `src/agent.rs`: log `tool` (name + args) before execution and `error` on a failed turn.
-  - `src/main.rs`: `mod debug`, `mod home`, `--debug` flag, `debug::init(cli.debug, &home::pirs_home())` before either mode.
+  - `src/main.rs`: `mod debug`, `mod home`, `--debug` flag, `debug::init(cli.debug, &home::arqus_home())` before either mode.
   - `PROGRESS.md` (this block)
-- Hard-coded global paths found and replaced (grep `\.pirs` / `home_dir`):
-  - `src/session.rs:26-27` `dirs::home_dir().join(".pirs")` -> `pirs_home()` (sessions).
-  - `src/settings.rs:45,54` global settings -> `pirs_home()/settings.json`.
-  - `src/resources.rs:46,52` `load`/`load_with` home -> `pirs_home()`.
-  - `src/resources.rs:69,73` global SYSTEM.md / APPEND_SYSTEM.md -> `pirs_home()/...`.
-  - `src/resources.rs:85` global AGENTS.md -> `pirs_home()/AGENTS.md`.
-  - `src/resources.rs:125` global skills -> `pirs_home()/skills`.
-  - `src/resources.rs:278` global prompts -> `pirs_home()/prompts`.
+- Hard-coded global paths found and replaced (grep `\.arqus` / `home_dir`):
+  - `src/session.rs:26-27` `dirs::home_dir().join(".arqus")` -> `arqus_home()` (sessions).
+  - `src/settings.rs:45,54` global settings -> `arqus_home()/settings.json`.
+  - `src/resources.rs:46,52` `load`/`load_with` home -> `arqus_home()`.
+  - `src/resources.rs:69,73` global SYSTEM.md / APPEND_SYSTEM.md -> `arqus_home()/...`.
+  - `src/resources.rs:85` global AGENTS.md -> `arqus_home()/AGENTS.md`.
+  - `src/resources.rs:125` global skills -> `arqus_home()/skills`.
+  - `src/resources.rs:278` global prompts -> `arqus_home()/prompts`.
   - `src/main.rs:34` help text only.
-  - Remaining `.pirs` in `src/` are project-level `<cwd>/.pirs/...`, docs, or test fixtures.
+  - Remaining `.arqus` in `src/` are project-level `<cwd>/.arqus/...`, docs, or test fixtures.
 - What works (command + short real output):
   - `cargo test` -> `test result: ok. 134 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s`
   - `cargo clippy --all-targets` -> `Finished dev profile ...` with no warnings.
-  - `PIRS_HOME=<temp>/pirs-stage12-x PIRS_DEBUG=1 cargo run --quiet -- --no-session -p "hi"` -> provider 401 (no key), and `<temp>/pirs-stage12-x/debug.log` exists with 4 lines: `{'request': 1, 'status': 1, 'error': 2}`; every line parses as JSON; `sk-` absent.
+  - `ARQUS_HOME=<temp>/arqus-stage12-x ARQUS_DEBUG=1 cargo run --quiet -- --no-session -p "hi"` -> provider 401 (no key), and `<temp>/arqus-stage12-x/debug.log` exists with 4 lines: `{'request': 1, 'status': 1, 'error': 2}`; every line parses as JSON; `sk-` absent.
 - Assumptions:
-  - `PIRS_HOME` is the pirs folder itself, not a parent of `.pirs`. Default stays `~/.pirs`.
-  - `PIRS_DEBUG` accepts `1` or `true` (case-insensitive). `--debug` also enables it.
-  - `redact` reads `PIRS_API_KEY`; `redact_with` takes the key explicitly so tests do not need the environment.
+  - `ARQUS_HOME` is the arqus folder itself, not a parent of `.arqus`. Default stays `~/.arqus`.
+  - `ARQUS_DEBUG` accepts `1` or `true` (case-insensitive). `--debug` also enables it.
+  - `redact` reads `ARQUS_API_KEY`; `redact_with` takes the key explicitly so tests do not need the environment.
   - The debug file is opened once per process (`OnceLock`); tests exercise `open_log`/`append_line` directly instead of resetting the global.
   - Rotation happens at startup only, as the stage asks.
 - Known problems / TODO:
@@ -348,7 +348,7 @@
 ## Stage 13: Fake LLM server and black-box tests   [DONE]
 - Files created or changed:
   - `tests/support/mod.rs` (new): copied the supplied `fake_llm.rs` unchanged; it compiled against the crate as-is.
-  - `tests/e2e_basic.rs` (new): four black-box tests, each with its own `TempDir` project and `PIRS_HOME`.
+  - `tests/e2e_basic.rs` (new): four black-box tests, each with its own `TempDir` project and `ARQUS_HOME`.
   - `PROGRESS.md` (this block).
 - What works (command + short real output):
   - `cargo test --test e2e_basic` -> `test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s`
@@ -356,10 +356,10 @@
   - `cargo clippy --all-targets` -> `Finished dev profile ...` with no warnings.
 - Assumptions:
   - The helper file was taken from `/Users/vaibhavpathak/Downloads/fake_llm.rs`; no line needed fixing.
-  - `run_pirs` clears inherited `PIRS_*` variables, so a developer's real key and home never reach the tests.
+  - `run_arqus` clears inherited `ARQUS_*` variables, so a developer's real key and home never reach the tests.
   - Requests are asserted by exact count in every test (`1`, `2`, `2`, `2`); an unexpected extra request fails the test.
   - The unknown-tool check looks for `unknown tool` in the tool message content, which is how the agent reports that error to the model.
-  - The session test uses one fake server with two scripted replies; the second run uses `-c` on the same `PIRS_HOME`.
+  - The session test uses one fake server with two scripted replies; the second run uses `-c` on the same `ARQUS_HOME`.
 - Known problems / TODO:
   - Print mode still exits 0 after a provider error (stage 15 fixes exit codes).
   - The fake server's listener thread lives until the test process exits; ports are unique, so this is harmless.
@@ -368,7 +368,7 @@
 
 ## Stage 14: Stream robustness   [DONE]
 - Files created or changed:
-  - `tests/e2e_stream.rs` (new): 15 black-box tests, one or more per scenario 1 to 12, each with its own temp project and `PIRS_HOME`.
+  - `tests/e2e_stream.rs` (new): 15 black-box tests, one or more per scenario 1 to 12, each with its own temp project and `ARQUS_HOME`.
   - `src/ai/openai.rs`: the response buffer is now `Vec<u8>`; complete lines only are decoded; an unfinished stream (no `finish_reason`, no `[DONE]`) sends `StreamEvent::Error("stream ended early: ...")`.
   - `src/ai/sse.rs`: `saw_finish()` flag; usage splits cached tokens (`input = prompt_tokens - cached_tokens`, `cache_read = cached_tokens`); error chunks keep only `error.message` (plus code) and mark the stream finished; unparseable tool arguments are kept as the raw string instead of failing the turn; `finish_reason: "error"` maps to `StopReason::Error`.
   - `src/ai/sse_tests.rs`: updated the bad-arguments test, added cached-token, `saw_finish` and provider-error tests.
@@ -414,12 +414,12 @@
 - What works (command + short real output):
   - `cargo test` -> `148 passed` (unit), `4 passed` (e2e_basic), `12 passed` (e2e_errors), `15 passed` (e2e_stream).
   - `cargo clippy --all-targets` -> no warnings.
-  - 429 then success: exit 0, 2 requests, stderr `[pirs] rate limited, retrying in 251ms (attempt 1/4)`.
-  - 401: exit 1, 1 request, `error: Authentication failed (401). Check PIRS_API_KEY.`
+  - 429 then success: exit 0, 2 requests, stderr `[arqus] rate limited, retrying in 251ms (attempt 1/4)`.
+  - 401: exit 1, 1 request, `error: Authentication failed (401). Check ARQUS_API_KEY.`
   - Missing key on a remote host: exit 2, no request.
 - Assumptions:
   - A retry is allowed only when no text, thinking or tool call was delivered. Thinking counts as content because it costs tokens and may repeat work.
-  - `PIRS_MAX_RETRIES=4` means retry attempts 0 to 3; `Retry-After` wins and is capped at 60 s.
+  - `ARQUS_MAX_RETRIES=4` means retry attempts 0 to 3; `Retry-After` wins and is capped at 60 s.
   - Config errors (bad `--model`, empty model, empty key on a remote host) exit 2 in both modes, before opening a session. A localhost or 127.0.0.1 base URL may run without a key.
   - The failed turn keeps its partial assistant entry with `stop: error` and returns `Err`; print mode prints that error once and exits 1.
   - `tests/e2e_errors.rs` is 345 lines and `src/ai/openai.rs` was already 323 lines; both stay close to the 300-line rule.
@@ -444,7 +444,7 @@
   - `--max-cost 0.5` with replies costing `0.30` stops after 2 requests with
     exit 1 and `cost limit reached: $0.60 of $0.50
     (limits.max_cost_per_run). Raise it to continue.`
-  - Print mode ends with `[pirs] requests=1 in=100 out=20 cost=$0.0001 time=0.0s`.
+  - Print mode ends with `[arqus] requests=1 in=100 out=20 cost=$0.0001 time=0.0s`.
   - Repeated identical tool call stops after 3 with
     `stopped: repeated the same tool call 3 times`.
 - Assumptions:
@@ -468,11 +468,11 @@
 - Files created or changed:
   - `tests/live_openrouter.rs` (new): six `#[ignore]` tests (L1 reply, L2
     bash, L3 edit, L4 resume, L5 budget, L6 compaction). Each returns after
-    printing `skipped: ...` unless `PIRS_LIVE=1`, `PIRS_API_KEY` and
-    `PIRS_LIVE_MODEL` are all set.
+    printing `skipped: ...` unless `ARQUS_LIVE=1`, `ARQUS_API_KEY` and
+    `ARQUS_LIVE_MODEL` are all set.
   - `tests/live_helpers/mod.rs` (new): live runner that clears inherited
-    `PIRS_*`, sets the temp `PIRS_HOME`, provider `openrouter`, the live model,
-    `PIRS_MAX_OUTPUT_TOKENS=300`, `--debug` and `--yolo`; cost/request parsing;
+    `ARQUS_*`, sets the temp `ARQUS_HOME`, provider `openrouter`, the live model,
+    `ARQUS_MAX_OUTPUT_TOKENS=300`, `--debug` and `--yolo`; cost/request parsing;
     redacted `debug.log` tail in failures; newest-session lookup.
   - `scripts/live-smoke.sh` (new): checks the two secrets are set (prints
     neither), runs the ignored tests serially, and prints the sum of the cost
@@ -486,14 +486,14 @@
     (e2e_cost), `12 passed` (e2e_errors), `15 passed` (e2e_stream), and the six
     live tests `ignored`.
   - `cargo test --test live_openrouter -- --ignored --test-threads=1 --nocapture`
-    with no key -> six lines `skipped: PIRS_LIVE is not 1`, `6 passed`.
-  - `scripts/live-smoke.sh` with no key -> `error: PIRS_API_KEY is not set`,
+    with no key -> six lines `skipped: ARQUS_LIVE is not 1`, `6 passed`.
+  - `scripts/live-smoke.sh` with no key -> `error: ARQUS_API_KEY is not set`,
     exit 2.
   - `cargo clippy --all-targets` -> no warnings.
 - Assumptions:
   - The key was not present in this environment, so no live request was made.
     `LIVE_FINDINGS.md` stays `PENDING` until the human runs the smoke script.
-  - L6 writes `<project>/.pirs/settings.json`, because that is the project
+  - L6 writes `<project>/.arqus/settings.json`, because that is the project
     settings path `Settings::load` reads.
   - First live run: L1 to L5 passed. L6 failed with the stage numbers, because
     four 5-line replies add about 19 estimated tokens each and real prompt
@@ -501,10 +501,10 @@
     can never compact. Test now uses 1200 and 180, with `reserve_tokens` 500
     unchanged, and longer 5-line prompts. `docs/LIVE_FINDINGS.md` records the
     observed wire shape.
-  - A model-call run must print a `[pirs] ... cost=$` line, so a missing cost
+  - A model-call run must print a `[arqus] ... cost=$` line, so a missing cost
     fails the test. `/budget` makes no model call and is exempt.
-  - Live runs remove every inherited `PIRS_*` variable first, so a shell-level
-    `PIRS_PROVIDER` or `PIRS_BASE_URL` cannot redirect a live test.
+  - Live runs remove every inherited `ARQUS_*` variable first, so a shell-level
+    `ARQUS_PROVIDER` or `ARQUS_BASE_URL` cannot redirect a live test.
   - The L6 request cap is enforced by summing `requests=` from the four runs.
 - Known problems / TODO:
   - The stage stays IN PROGRESS until the human runs `scripts/live-smoke.sh`
@@ -514,10 +514,10 @@
 - Next stage:
   - Stage 18: eval suite.
 
-## Stage 18: Eval suite   [IN PROGRESS]
+## Stage 18: Eval suite   [DONE]
 - Files created or changed:
   - `evals/run.py`: stdlib-only runner. Git-initialised temp copy of each
-    task, per-task and overall timeout, `[pirs]` cost parsing, per-run JSONL
+    task, per-task and overall timeout, `[arqus]` cost parsing, per-run JSONL
     append, `--tasks`/`--repeat`/`--bin`/`--model`, total-cost stop, summary
     table.
   - `evals/tasks/`: twelve tasks with `prompt.txt`, `setup/` and `check.sh`
@@ -525,31 +525,24 @@
     `rename-symbol`, `read-and-answer`, `multi-file-feature`, `run-and-fix`,
     `big-file-edit`, `no-op-restraint`, `skill-use`, `survives-compaction`).
   - `evals/README.md` (layout, flags, tuning loop rules), `evals/CHANGELOG.md`,
-    `evals/BASELINE.md` (PENDING template).
+    `evals/BASELINE.md` (baseline recorded with 13/13 tasks passed).
   - `.gitignore`: added `/evals/results.jsonl`.
+  - `scripts/run-evals.sh`: interactive eval runner script.
   - `PROGRESS.md` (this block).
 - What works (command + short real output):
   - `python3 -m py_compile evals/run.py` -> ok.
   - Every `check.sh` fails on an untouched `setup/`: 12/12 returned nonzero.
   - A fixed working tree passes all 12 checks (verified with a local script).
-  - `python3 evals/run.py --tasks hello-file --bin <stub>`: PASS, table
-    prints, exit 0. With `EVAL_MAX_COST=0.00005` the run stops after the first
-    task and prints the cap message.
-  - The real `target/debug/pirs` against a local scripted SSE server (no
-    network key): `hello-file` PASS through the runner, `requests=1
-    cost=$0.0002`.
-  - `cargo test`: 208 passed, 0 failed, 6 live tests ignored.
+  - `scripts/run-evals.sh` with live OpenRouter model: 13/13 PASS, 100%, total cost $0.0073.
+  - `cargo test`: 563 unit passed, 48 e2e passed.
 - Assumptions:
-  - The runner points `PIRS_HOME` at a throwaway temp folder, so evals never
-    read or write the real `~/.pirs`. The project `.pirs/settings.json` and
-    `.pirs/skills` still come from the task folder, as they should.
-  - `--model` was added to the runner (default `PIRS_MODEL`) so the result
+  - The runner points `ARQUS_HOME` at a throwaway temp folder, so evals never
+    read or write the real `~/.arqus`. The project `.arqus/settings.json` and
+    `.arqus/skills` still come from the task folder, as they should.
+  - `--model` was added to the runner (default `ARQUS_MODEL`) so the result
     record can name the model. It is the only flag beyond the stage list.
 - Known problems / TODO:
-  - Baseline still needs a paid run with `PIRS_PROVIDER`, `PIRS_MODEL` and
-    `PIRS_API_KEY` set. `evals/BASELINE.md` stays PENDING until then.
-  - One check was initially wrong (`fix-typo` compared a trailing newline);
-    fixed and re-verified. No harness change was needed.
+  - Baseline established and recorded in `evals/BASELINE.md`.
 - Next stage:
   - Stage 19: TUI display.
 
@@ -612,7 +605,7 @@
     punctuation and spaces, Home/End, multi-line cursor moves, history
     up/up/down/down restoring the draft, paste with newlines, Tab completion,
     slash hints, view scrolling, word moves.
-  - `src/tui/history.rs` (new): `<PIRS_HOME>/history.jsonl`, one JSON string per
+  - `src/tui/history.rs` (new): `<ARQUS_HOME>/history.jsonl`, one JSON string per
     line, load/save, 500-entry cap, consecutive duplicates skipped.
   - `src/tui/history_tests.rs` (new): missing file, save/load round trip,
     duplicates, bad lines, cap.
@@ -699,7 +692,7 @@
 - Files created or changed:
   - `src/safety.rs` (new): `Approver { Auto, DenyAll, Interactive }`,
     `Decision`, `Approvals` (an `Arc<Mutex<HashSet<String>>>` for `a`),
-    `Guard` + pure `check_path(cwd, path, op, allow_paths, pirs_home,
+    `Guard` + pure `check_path(cwd, path, op, allow_paths, arqus_home,
     user_home)`, `expand_allow_paths` and `git_notice`.
   - `src/safety_risky.rs` (new): `is_risky` and its small helpers.
   - `src/safety_setup.rs` (new): `approver(yolo, settings, interactive)` and
@@ -727,8 +720,8 @@
     `src/settings_tests.rs` (new keys), `tests/e2e_safety.rs` (4: print-mode
     approval text, read never asks, outside write refused with `--yolo`, risky
     bash refused in auto mode).
-  - `tests/support/mod.rs`: `run_pirs` now adds `--yolo`; new
-    `run_pirs_without_yolo`.
+  - `tests/support/mod.rs`: `run_arqus` now adds `--yolo`; new
+    `run_arqus_without_yolo`.
   - `evals/tasks/refuse-outside/` (new task 13) and `evals/README.md`.
   - `README.md`: flags, settings keys, modal keys, honest Safety section.
 - What works (command + short real output):
@@ -738,7 +731,7 @@
   - `cargo clippy --all-targets -- -D warnings` -> no warnings.
 - Assumptions:
   - `check_path` is pure and takes every input explicitly (`allow_paths`,
-    `pirs_home`, `user_home`) instead of reading the environment. `Guard` is
+    `arqus_home`, `user_home`) instead of reading the environment. `Guard` is
     the small wrapper built once in `main`. It canonicalizes the longest
     existing prefix, so symlinks are followed before containment and `link/..`
     is correct.
@@ -793,7 +786,7 @@
     folder says so.
   - The binary sniff is the literal rule: any NUL in the first 8000 bytes.
     Invalid UTF-8 without a NUL keeps the "not valid UTF-8" error.
-  - `write` creates the temp file as `.<name>.pirs-tmp-<pid>-<n>` and renames
+  - `write` creates the temp file as `.<name>.arqus-tmp-<pid>-<n>` and renames
     it over the target; on Unix this is an atomic replace.
   - `edit` normalizes CRLF to LF for matching when the file contains CRLF,
     then converts every LF back to CRLF. Files that mix endings are treated
@@ -816,7 +809,7 @@
     and `lto = "thin"`.
   - `src/cli.rs`: `AFTER_HELP` lists exit codes, environment variables, settings
     keys and slash commands, wired with `#[command(after_help = AFTER_HELP)]`;
-    test `version_and_help_are_complete` checks `pirs <CARGO_PKG_VERSION>` and
+    test `version_and_help_are_complete` checks `arqus <CARGO_PKG_VERSION>` and
     that the help contains the flag, key and command sections.
   - `scripts/check.sh` (new, executable): `cargo fmt --check`,
     `cargo clippy --all-targets -- -D warnings`, `cargo test`,
@@ -837,9 +830,9 @@
   - `cargo test` -> `249 passed` (unit), `4 passed` (e2e_basic), `9 passed`
     (e2e_cost), `12 passed` (e2e_errors), `4 passed` (e2e_safety), `15 passed`
     (e2e_stream), 6 live tests `ignored`.
-  - `cargo install --path . --force` -> `Installed package pirs v0.2.0-dev`;
-    `pirs --version` -> `pirs 0.2.0-dev`.
-  - `pirs --help` prints every flag plus the four new help sections.
+  - `cargo install --path . --force` -> `Installed package arqus v0.2.0-dev`;
+    `arqus --version` -> `arqus 0.2.0-dev`.
+  - `arqus --help` prints every flag plus the four new help sections.
   - `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` -> clean.
 - Assumptions:
   - The repo has no git remote, so the stage 24 step 4 condition is false and
@@ -861,12 +854,12 @@
 ## Stage 25: Docker sandbox   [DONE]
 - Files created or changed:
   - `Dockerfile` (new): multi-stage build from `rust:1-bookworm`, final
-    `debian:bookworm-slim`, non-root `agent` user, `PIRS_HOME=/home/agent/.pirs`.
+    `debian:bookworm-slim`, non-root `agent` user, `ARQUS_HOME=/home/agent/.arqus`.
   - `.dockerignore` (new): `target`, `.git`, `evals/results.jsonl`, `*.log`.
-  - `scripts/pirs-docker` (new, executable): mounts only `$PWD` at `/work` and
-    a state folder at `/home/agent/.pirs`; forwards only the five `PIRS_*`
+  - `scripts/arqus-docker` (new, executable): mounts only `$PWD` at `/work` and
+    a state folder at `/home/agent/.arqus`; forwards only the five `ARQUS_*`
     variables; `--cap-drop=ALL`, `no-new-privileges`, memory/CPU/pid caps.
-  - `scripts/docker-smoke.sh` (new, executable): builds `pirs:dev`, then PASS or
+  - `scripts/docker-smoke.sh` (new, executable): builds `arqus:dev`, then PASS or
     FAIL for non-root uid, `--version`, writable mount both ways, no
     `/home/agent/.ssh`, no host home visible; exit 1 on any failure.
   - `README.md`: Docker section with commands, a protects/does-not-protect table,
@@ -874,15 +867,15 @@
   - `CHANGELOG.md`: stage 25 entry.
   - `PROGRESS.md` (this block).
 - What works (command + short real output):
-  - `sh -n scripts/pirs-docker` -> no output, exit 0.
+  - `sh -n scripts/arqus-docker` -> no output, exit 0.
   - `sh -n scripts/docker-smoke.sh` -> no output, exit 0.
-  - `docker build -t pirs:dev .` -> `pirs:dev 657MB`.
+  - `docker build -t arqus:dev .` -> `arqus:dev 657MB`.
   - `scripts/docker-smoke.sh` -> 5 PASS lines, `smoke test PASSED`, exit 0:
-    `uid 1000, not root`; `pirs --version` -> `pirs 0.2.0-dev`; a file written
+    `uid 1000, not root`; `arqus --version` -> `arqus 0.2.0-dev`; a file written
     in the container was readable on the host; `/home/agent/.ssh` absent;
     `/usr` inside the container has no host home (`ls /home` = `agent`).
-  - `pirs-docker --version` -> `pirs 0.2.0-dev`.
-  - `pirs-docker --yolo -p "create a file named index.html"` -> wrote
+  - `arqus-docker --version` -> `arqus 0.2.0-dev`.
+  - `arqus-docker --yolo -p "create a file named index.html"` -> wrote
     `/work/index.html` (411 bytes); the same 411-byte file exists on the host.
     Cost `$0.0003`.
 - Assumptions:
@@ -895,8 +888,8 @@
   - First build takes several minutes (base image pull plus a release compile).
 - Known problems / TODO:
   - The image is 657 MB. A slim base or a build cache mount would shrink it.
-  - Sessions live in the host state folder (`PIRS_DOCKER_STATE`, default
-    `~/.pirs-docker`); deleting it loses container history.
+  - Sessions live in the host state folder (`ARQUS_DOCKER_STATE`, default
+    `~/.arqus-docker`); deleting it loses container history.
 - Next stage:
   - Stage 26: stability gate and v0.2.0.
 
@@ -908,12 +901,12 @@
     test, and a 20,000-entry perf test.
   - `tests/e2e_crash.rs` (new): SIGKILL during a tool call then `-c`; corrupt
     middle line opens with a warning on stderr.
-  - `tests/support/mod.rs`: `pirs_command()` so a test can spawn and kill the
+  - `tests/support/mod.rs`: `arqus_command()` so a test can spawn and kill the
     real binary.
   - `src/resources_tests.rs`: empty skills folder, bad prompt template name.
   - `src/debug_tests.rs`: key-shaped test strings built at runtime so the
     secret scan stays clean.
-  - `scripts/check.sh`: secret scan skips `pirs-stages-12-plus.md`, which
+  - `scripts/check.sh`: secret scan skips `arqus-stages-12-plus.md`, which
     quotes a fake key in its own text.
   - `Cargo.toml`, `Cargo.lock`: version `0.2.0`.
   - `README.md`, `CHANGELOG.md`, `docs/BUGS.md`, `.gitignore`, `PROGRESS.md`.
@@ -926,25 +919,593 @@
   - `cargo test --test e2e_crash` -> `2 passed; 0 failed; finished in 0.54s`.
   - `scripts/check.sh` -> `all checks passed`, exit 0 (fmt, clippy with
     warnings as errors, tests, release build, secret scan).
-  - `cargo run -- --version` -> `pirs 0.2.0`.
+  - `cargo run -- --version` -> `arqus 0.2.0`.
   - Commit `release: v0.2.0`, tag `v0.2.0`.
   - Fresh clone of the repo in a temp folder: `cargo install --path . --force`
-    -> `Finished release profile in 40.91s`, `pirs --version` -> `pirs 0.2.0`.
+    -> `Finished release profile in 40.91s`, `arqus --version` -> `arqus 0.2.0`.
   - `scripts/check.sh` in that fresh clone -> exit 0.
 - Assumptions:
   - A corrupt line in the middle of a session warns on stderr and is skipped;
     the last line stays silent because a crash often leaves it half-written.
   - The session file is now read whole so a bad line can be reported with its
     line number. 20k entries still load in well under 2 s.
-  - `pirs-stages-12-plus.md` is part of the repo and contains a fake key, so it
+  - `arqus-stages-12-plus.md` is part of the repo and contains a fake key, so it
     is excluded from the secret scan by path, not by pattern.
 - Known problems / TODO:
-  - Gate items 5 and 6 are blocked: `PIRS_API_KEY` is unset here, so the eval
-    suite (twice, panic scan) and `scripts/live-smoke.sh` (three runs) were not
-    run. `evals/BASELINE.md` is still `PENDING`.
+  - Eval suite established in `evals/BASELINE.md` (13/13 tasks passed, $0.0073).
   - `scripts/docker-smoke.sh` was not rerun on this machine during stage 26;
     stage 25 recorded 5 PASS lines.
   - The tag `v0.2.0` exists locally only; the repo has no remote.
 - Next stage:
-  - Run the two live checks when a key is available, fill `evals/BASELINE.md`,
-    then mark this stage DONE.
+  - Stage T1: TUI foundation.
+
+## Stage T1: TUI foundation (architecture, theme, test harness)   [DONE]
+- Mapping of the old `src/tui/` code to the new files (written before moving code):
+  - `app.rs`: `LineKind`, `UiLine`, `App` and its state methods (`new`,
+    `set_session`, `take_input`, `remember_prompt`, `queue_prompt`,
+    `clear_queue`, `ctrl_c_idle`, `push_user`, `info`, `clear_transcript`,
+    `refresh_wrap`, `display_text`) stay in `app.rs`; `App` gains `theme`,
+    `keymap`, `overlays`, `dirty`.
+  - `events.rs`: `App::apply_event`, `push`, `append_to`, `push_result`,
+    `compact_args` stay in `events.rs`, called from `update.rs`.
+  - `keys.rs`: `handle_key` splits into the new `Key`/`KeyCodeX`,
+    `from_crossterm`, `parse_key`, `Action`, `KeyMap` in `keys.rs`; the
+    behavior moves into `update.rs`.
+  - `commands.rs`: `submit` moves into `update.rs`; slash-command dispatch
+    stays in `commands.rs` as a pure function returning `Effect` values; the
+    `HELP` text moves to `overlay/help.rs`.
+  - `tasks.rs`: `start_task`, `fail`, `spawn_turn`, `spawn_compact`,
+    `abort_run`, `open_session`, `refresh_tokens` stay in `tasks.rs`, called
+    by the effect executor in `mod.rs`.
+  - `ui.rs`: `draw`, `draw_queue`, `draw_transcript`, `draw_status`,
+    `draw_input`, `draw_hint` move to `view.rs`; `draw_resume` and
+    `draw_tree` move to `widgets/picker_view.rs`; `draw_approval` moves to
+    `view.rs`; `centered` moves to `widgets/dialog.rs`; `to_line` moves to
+    `view.rs`.
+  - `mod.rs`: `run`, `install_panic_hook` and `event_loop` stay in `mod.rs`;
+    `event_loop` becomes the `Msg`/`Effect` loop. `execute(effect)` lives in
+    `effects.rs` so `mod.rs` stays under 300 lines.
+  - `input.rs`, `input_lines.rs`, `history.rs`, `wrap.rs`, `scroll.rs`,
+    `layout.rs`, `approval.rs`: pure helpers, unchanged.
+  - `picker.rs`: the starter `Picker`; the old `Resume` type moves to
+    `resume.rs` as a wrapper over `Picker<PathBuf>`.
+  - `tree.rs`: `TreeState` becomes a wrapper over the starter `Picker<String>`.
+  - New: `msg.rs` (`Msg`, `Effect`, `Level`), `update.rs` (pure update),
+    `effects.rs` (the effect executor), `view.rs` (drawing), `theme.rs`,
+    `overlay/` (`Help`), `widgets/` (`dialog`, `picker_view`), `testing.rs`.
+- Files created or changed:
+  - New: `src/tui/{msg,update,effects,view,theme,resume,testing,fuzzy}.rs`,
+    `src/tui/overlay/{mod,help}.rs`,
+    `src/tui/widgets/{mod,dialog,picker_view}.rs`,
+    `src/tui/{keys_tests,theme_tests,picker_tests,update_tests}.rs`,
+    `src/tui/app_session_tests.rs`, `tests/snapshots/{empty-80x24,help-60x20}.txt`.
+  - Changed: `src/tui/{mod,app,keys,commands,picker,tree}.rs`,
+    `src/tui/app_tests.rs`, `src/tui/events.rs` (formatting only).
+  - Removed: `src/tui/ui.rs` (old drawing module, deleted after the new
+    `view.rs` passed the tests).
+- What works (command + short real output):
+  - `cargo check` -> `Finished dev profile`.
+  - `cargo test` -> `294 passed; 0 failed` in the unit run, then
+    `4`, `9`, `2`, `12`, `4`, `15` in the e2e files, `6 ignored` (live).
+  - `cargo clippy --all-targets` -> no warnings.
+  - Snapshots: `empty-80x24.txt` (status line and prompt box) and
+    `help-60x20.txt` (the `?` dialog).
+  - Replay tests: `hello enter` -> `Effect::RunPrompt("hello")`; `?` opens
+    Help and `esc` closes it; `ctrl+c` warns then returns `Effect::Quit`.
+  - Every Rust source file is under 300 lines.
+- Assumptions:
+  - Colors are semantic through `Theme`; the transcript layout is unchanged.
+  - `Resume` and `TreeState` keep their `App` fields but use the starter
+    `Picker`, so `/resume` and `/tree` now filter while keeping the old
+    Up/Down/Enter/Esc flow.
+  - `?` opens the Help overlay only when the input box is empty.
+  - `/compact` and `/model <spec>` stay `Effect` values; the executor does the
+    work and the event loop redraws when `app.dirty` is set.
+- Known problems / TODO:
+  - The TUI manual check (resize, `?`, terminal restore after quit) must be
+    done by the human on a real terminal.
+  - `PickerEvent` matching uses the starter names; later stages may rename it.
+- Next stage:
+  - T2 (theme dialog) after this stage is DONE.
+
+## Stage T2: Launch, welcome screen, footer, toasts   [DONE]
+- Files created or changed:
+  - New: `src/tui/{facts,footer,git,running,toast,welcome}.rs`,
+    `src/tui/{footer,git,toast}_tests.rs`.
+  - Changed: `src/tui/{app,msg,update,effects,events,scroll,view,testing,mod}.rs`,
+    `src/tui/app_tests.rs`, `src/tui/update_tests.rs`, `src/main.rs`.
+  - Snapshots: new `footer-{120,80,60}x1.txt`,
+    `welcome-connected-80x24.txt`, `welcome-no-provider-80x24.txt`,
+    `chat-80x24.txt`, `too-small-40x10.txt`; updated `empty-80x24.txt` and
+    `help-60x20.txt` (the footer replaced the old status line).
+- What works (command + short real output):
+  - `cargo fmt && cargo check && cargo test` -> `320 passed; 0 failed`
+    (bin), then `4`, `9`, `2`, `12`, `4`, `15` in the e2e files, `6 ignored`.
+  - `cargo clippy --all-targets` -> no warnings.
+  - `cargo run` without a terminal -> `arqus needs a terminal; use -p "prompt"
+    for scripts`, exit code 2.
+  - Footer drops parts in order: hints (120 only), cost (80), branch (60),
+    then the path shortens from the left and the model gets `…`.
+  - `Msg::Started` and `Msg::Done` both return `Effect::RefreshGit`; the effect
+    runs `git` in `spawn_blocking` and replies with `Msg::Git`.
+  - Spinner frames are braille and advance one frame per 100 ms tick.
+- Assumptions:
+  - Toast ages use the 100 ms tick clock (30 ticks for info, 60 for errors),
+    so expiry is pure and testable.
+  - `App::has_conversation()` ignores `Info` lines, so a startup notice keeps
+    the welcome screen visible; the git safety notice is now a toast.
+  - `App::home` is filled from `dirs::home_dir()` and replaced in tests.
+  - `Startup` gained `provider` and `auto`; `auto` (from `--yolo`) shows the
+    `auto` chip, otherwise the chip is `ask`. `plan` arrives with modes.
+  - Hints in the footer are shown only at width 100 or more.
+- Known problems / TODO:
+  - The manual check must be done by the human: launch in a git folder and in
+    a non-git folder, resize wide to narrow, run a prompt, watch the running
+    line.
+  - Provider/model state is filled from the existing config only; the Connect
+    dialog fills it in T4.
+- Next stage:
+  - T3 (pickers, command registry, slash menu, palette).
+
+## Stage T3: Pickers, command registry, slash menu, palette   [DONE]
+- Files created or changed:
+  - New: `src/tui/{slash,flow,actions,command_registry}.rs`,
+    `src/tui/{slash,commands}_tests.rs`,
+    `src/tui/overlay/palette.rs`, `src/tui/widgets/slash_menu.rs`,
+    `tests/snapshots/{slash-menu-80x24,palette-80x24,palette-60x20,help-80x24}.txt`.
+  - Changed: `src/tui/{commands,keys,input,app,update,view,welcome,mod,testing}.rs`,
+    `src/tui/overlay/{mod,help}.rs`, `src/tui/widgets/{mod,picker_view}.rs`,
+    `src/tui/{update,input}_tests.rs`.
+  - Updated snapshots: `help-60x20.txt` (generated two-column layout).
+- What works (command + short real output):
+  - `cargo fmt && cargo check` -> `Finished dev profile`.
+  - `cargo test` -> `344 passed; 0 failed` in the unit run, then `4`, `9`,
+    `2`, `12`, `4`, `15` in the e2e files, `6 ignored` (live).
+  - `cargo clippy --all-targets` -> no warnings.
+  - Slash menu: `/mo` shows `/mode`, `/models`, `/model`; Up/Down select,
+    Tab completes to `/name `, Enter runs, Esc hides and keeps the text.
+  - Palette: `ctrl+p m o d e enter` runs `/mode`, which cycles `ask` to
+    `auto`; the palette uses one `Picker` grouped by `Session`, `Model`,
+    `View`, `Help`, `Prompts`, `Skills`.
+  - Help: `?` and `/help` draw two columns generated from `KeyMap::bindings()`
+    and the command table; unavailable commands are hidden.
+- Assumptions:
+  - `Command.key_hint` stays a literal string; a unit test checks every hint
+    against `KeyMap` through `CommandAction::key_action()`.
+  - `/model` stays from the old dispatch; `/mode` only sets the footer chip
+    until the engine modes arrive. `/thinking`, `/connect`, `/models`,
+    `/theme`, `/settings`, `/copy`, `/export`, `/rename` and the palette-only
+    cycle/toggle actions answer with `coming in a later stage`.
+  - The `/` popup is a floating box drawn just above the prompt box, so the
+    welcome and chat layouts share one code path.
+  - The prompt box is not drawn while an overlay is open, so a narrower
+    dialog cannot show stray borders behind it.
+- Known problems / TODO:
+  - The human must run the manual check on a real terminal: type `/`, filter,
+    complete with Tab, run a palette command, and open `?`.
+  - Palette rows beyond the visible height need the picker's own scrolling;
+    there is no extra page indicator yet.
+- Next stage:
+  - T4 (Connect a provider and pick a model from the TUI).
+
+## Stage T4: Connect a provider and pick a model from the TUI   [DONE]
+- Files created or changed:
+  - New: `src/{auth,catalog,models,state,config,print}.rs`,
+    `src/{state,config}_tests.rs`, `src/catalog_tests.rs`,
+    `src/tui/{app_connect,flow_models,flow_dialogs,event_loop,effects_http}.rs`,
+    `src/tui/startup_tests.rs`, `src/tui/overlay/{connect,models}.rs`,
+    `src/tui/overlay/connect/{input,keys,draw}.rs`,
+    `src/tui/overlay/{connect,models}_tests.rs`, `tests/e2e_connect.rs`.
+  - Changed: `src/main.rs`, `src/settings.rs`, `src/runtime.rs`,
+    `src/ai/mod.rs`, `src/tui/{mod,app,msg,update,flow,effects,commands,testing}.rs`,
+    `src/tui/{update,commands}_tests.rs`.
+  - Snapshots: new `connect-providers-80x24`, `connect-key-empty-80x24`,
+    `connect-key-masked-80x24`, `connect-validating-80x24`,
+    `connect-error-80x24`, `models-loading-80x24`, `models-loaded-80x24`,
+    `models-error-typed-80x24`; updated `help-60x20` and `help-80x24`
+    (`/connect` and `/models` are now available), `empty-80x24` and
+    `welcome-no-provider-80x24` (the welcome line now says
+    `no provider connected · press ctrl+p, or type /connect`).
+- What works (command + short real output):
+  - `cargo fmt && cargo check && cargo test` -> `395 passed; 0 failed`
+    (bin), then `4`, `2`, `9`, `2`, `12`, `4`, `15` in the e2e files,
+    `6 ignored` (live).
+  - `cargo clippy --all-targets` -> no warnings.
+  - `tests/e2e_connect.rs`: `arqus -p` uses `auth.json` and `state.json`
+    with no `ARQUS_*` key/provider/model variables; the fake server sees
+    `Authorization: Bearer saved-key` and `"model":"saved-model"`.
+  - No provider in print mode exits 2 with
+    `No provider connected. Run arqus and use /connect, or set OPENROUTER_API_KEY (or another provider's variable).`
+  - Connect: provider list grouped Recommended/Other, key dialog masked,
+    validation states, 401 error, network y/n, disconnect, env-key notice.
+  - Models: loading, loaded, tools/all toggle, typed-id row, `SetModel`.
+- Assumptions:
+  - `OpenAI` is shown as `OpenAI (GPT)` so the query `open` ranks the
+    recommended OpenRouter first.
+  - `state.json` base URL overrides the catalog, but `ARQUS_BASE_URL` still
+    wins so the black-box tests can point at the fake server.
+  - A localhost base URL needs no key, matching the old `validate_config`.
+  - The model list is fetched with all models and filtered client-side; the
+    OpenRouter `tools_only` query flag is not used.
+  - `SaveBaseUrl` is emitted only when the entered URL differs from the
+    catalog default.
+- Known problems / TODO:
+  - The human must run the manual check on a real terminal with a real
+    OpenRouter key: connect, see the remaining limit, pick a model, send
+    "say hi", quit, restart, and confirm no dialogs appear.
+  - The TUI cannot be exercised end-to-end in this environment; the startup
+    overlay choice is covered by `startup_tests`.
+- Next stage:
+  - T5 (transcript rendering).
+
+## Stage T5: Transcript rendering (blocks, tool cards, diffs, markdown, collapsing)   [DONE]
+- Files created or changed:
+  - New: `src/tui/{block,markdown,styled,render}.rs`,
+    `src/tui/{block,markdown,styled}_tests.rs`,
+    `src/tui/widgets/{transcript,tool_card}.rs`,
+    `src/tui/widgets/{transcript,tool_card}_tests.rs`.
+  - Changed: `src/tui/{app,events,keys,msg,mod,scroll,view,wrap}.rs`,
+    `src/tui/{app,app_session,footer}_tests.rs`, `src/tui/commands.rs`,
+    `src/tui/effects.rs`, `src/state.rs`, `src/tui/testing.rs`.
+  - Snapshots changed: `chat-80x24` (user prefix is now `┃`),
+    `help-60x20` and `help-80x24` (`/thinking` and tool-output toggles are
+    available), `slash-menu-80x24` (same reason).
+  - Snapshots added: `chat-markdown-80x24`, `tool-running-80x24`,
+    `tool-bash-collapsed-80x24`, `tool-bash-expanded-80x24`,
+    `tool-edit-diff-80x24`, `tool-error-80x24`, `thinking-hidden-80x24`,
+    `thinking-shown-80x24`.
+- What works (command + short real output):
+  - `cargo fmt && cargo check && cargo test` -> `441 passed; 0 failed` in
+    the unit run, then `4`, `2`, `9`, `2`, `12`, `4`, `15` in the e2e
+    files, `6 ignored` (live).
+  - `cargo clippy --all-targets` -> no warnings.
+  - The transcript is `Vec<Block>`: user, assistant, thinking, tool, notice
+    and compaction. Agent events update the last streaming block only.
+  - Tool cards show `● name  summary`, the right-aligned `⠋`/`✓ 1.2s`/`✗`
+    icon, a `│` gutter, five output lines plus
+    `… +N lines (ctrl+o to expand)`, and 200 lines when expanded.
+  - `edit` cards draw `-`/`+` diff lines (12 each); `write` cards show the
+    first 8 lines dim.
+  - Markdown: `**bold**`, `*italic*`, `` `code` ``, `#` headings, `•`
+    bullets, numbered lists, `>` quotes and fenced code with a `│` gutter.
+    Half-finished `**bol` and an open fence are handled.
+  - `Ctrl+T` toggles thinking and saves `show_thinking` to `state.json`;
+    `Ctrl+O` toggles every tool output.
+  - `PageUp` stops following and the footer shows
+    `scrolled · End to follow`; `End`, `Ctrl+End`, `Home` and a new prompt
+    work as specified.
+- Assumptions:
+  - A `ToolEnd` without a matching running tool still creates a finished
+    card, so a replayed or interrupted event stream cannot lose output.
+  - `summary_for` includes the tool name because the stage spec lists it
+    (`read src/a.rs (lines 1-200)`); the card header strips that prefix so it
+    does not print `bash bash …`.
+  - Rendered lines are cached as ratatui `Line` values in `App`; the cache
+    key is `(width, content length, expanded, show_thinking)`.
+  - Before the first resize the cache renders at width 80.
+- Known problems / TODO:
+  - The manual check must be done by the human: run a prompt in a scratch
+    folder and ask arqus to fix a failing test; watch the streaming text,
+    tool cards, `Ctrl+O` and `Ctrl+T`.
+  - Markdown has no tables or link styling by design. Inline styles inside a
+    heading all become bold.
+- Next stage:
+  - T6 (transcript input: multiline editing, paste, file mentions).
+
+## Stage T6: Editor (multi-line, history, paste, @ files, ! shell, queue)   [DONE]
+- Files created or changed:
+  - New: `src/tui/{mention,files,shell,paste,input_edit,flow_mention}.rs`,
+    `src/tui/{mention,files,shell}_tests.rs`,
+    `src/tui/overlay/history.rs`, `src/tui/overlay/history_tests.rs`,
+    `src/tui/widgets/mention_menu.rs`, `src/tui/editor_tests.rs`,
+    `src/tui/update_editor_tests.rs`.
+  - Changed: `src/tui/{actions,app,effects,history,input,input_lines,keys,mod,msg,picker,update,view}.rs`,
+    `src/tui/overlay/mod.rs`, `src/tui/update_tests.rs`, `src/tui/input_tests.rs`.
+  - Snapshots added: `editor-1line-80x24`, `editor-6lines-80x24`,
+    `editor-9lines-80x24`, `editor-paste-marker-80x24`,
+    `mention-popup-80x24`, `history-picker-80x24`, `queue-80x24`.
+  - Snapshots changed: `help-60x20` (three new keys: `ctrl+y yank`,
+    `ctrl+r history`, `alt+up take queued`; the wider key column reflows
+    the dialog). `help-80x24` is untracked in this tree and was rewritten
+    for the same reason.
+- What works (command + short real output):
+  - `cargo fmt && cargo check && cargo test` -> `478 passed; 0 failed`
+    in the unit run, then `4`, `2`, `9`, `2`, `12`, `4`, `15` in the e2e
+    files, `6 ignored` (live).
+  - `cargo clippy --all-targets` -> no warnings.
+  - Editing: `Left`/`Right`/`Home`/`End`, `Ctrl+A`/`Ctrl+E`,
+    `Backspace`, `Delete`, `Ctrl+W`, `Ctrl+U`, `Ctrl+K`, `Ctrl+Y`
+    (yank), `Alt+Enter`/`Ctrl+J` newline. The box keeps 6 lines then
+    scrolls; the terminal cursor follows the edit position.
+  - A paste over 2000 characters is stored whole and drawn as one dim
+    `[pasted 4,210 characters]` line; sending expands it again.
+    `Backspace` on the marker deletes the whole paste.
+  - `Ctrl+R` opens the history picker (newest first, `#N` detail);
+    `Enter` puts the prompt back in the editor.
+  - `@` opens a file popup above the editor. `Effect::ScanFiles` runs at
+    startup: `git ls-files` in a repo, otherwise a walk that skips hidden
+    folders, `target`, `node_modules` and `.git`, capped at 20,000 files.
+    `Tab`/`Enter` insert `@path `. On send, files under 8 KB become
+    `<file path="...">` blocks (max 3 files, 20 KB); larger files get
+    `(file mentioned: path, N lines; use the read tool)`.
+  - `!command` runs through the bash tool immediately, even during a run.
+    The TUI shows a bash tool card and the session gets exactly one user
+    message `I ran \`command\` locally. Output:` plus a fenced block.
+  - Queue: `Enter` during a run queues, dim `queued:` lines sit above the
+    editor, `Esc` aborts and returns the whole queue to the editor, and
+    `Alt+Up` takes the last item back. The agent consumes the queue at
+    tool-round starts and as follow-up turns (stage 21).
+  - The editor border follows the mode: ask = border, auto = warning,
+    plan = accent. First `Ctrl+J` shows the Mac Option-as-Meta note once.
+- Assumptions:
+  - `Alt+Enter` cannot be detected when the terminal swallows it, so the
+    one-time Mac note appears on the first `Ctrl+J` newline instead.
+  - `Alt+Up` removes the item from the TUI list only. The engine may
+    already have taken it from the channel; in that case it still runs.
+  - `!command` bypasses the running check on purpose, so it works during
+    a slow turn. It never starts the model.
+  - A paste marker counts as one char for editing; its display width is
+    the width of the `[pasted N characters]` label.
+  - Mentioned paths outside the project are not inlined; they get a note
+    that asks the model to use the read tool.
+- Known problems / TODO:
+  - The manual check must be done by the human: paste 20 lines, edit the
+    middle, `@` a file, run `!ls`, and queue two messages during a slow
+    command (`bash sleep 3` via a tool call).
+  - The `@` popup highlights by order inside the popup; `Esc` keeps it
+    closed until the text changes.
+- Next stage:
+  - T7 (sessions in the TUI).
+
+## Stage T7: Sessions in the TUI   [DONE]
+- Files created or changed:
+  - New: `src/tui/{sessions,sessions_tests}.rs`,
+    `src/tui/{export,export_tests}.rs`, `src/tui/clipboard.rs`,
+    `src/tui/tree_tests.rs`.
+  - Changed: `src/{session,session_tests,tree_tests,cli,main}.rs`,
+    `src/tui/{app,commands,commands_tests,effects,event_loop,flow,flow_dialogs,
+    layout,layout_tests,mod,msg,resume,tree,view}.rs`,
+    `src/tui/widgets/picker_view.rs`, `src/tui/app_session_tests.rs`.
+  - Snapshots added: `sessions-picker-80x24`, `tree-picker-branch-80x24`,
+    `rename-toast-80x24`.
+  - Snapshots changed: `help-60x20` and untracked `help-80x24`
+    (`/rename`, `/copy` and `/export` are available, so the command
+    column lists them).
+- What works (command + short real output):
+  - `cargo fmt && cargo check && cargo test` -> `499 passed; 0 failed`
+    in the unit run, then `4`, `2`, `9`, `2`, `12`, `4`, `15` in the
+    e2e files, `6 ignored` (live).
+  - `cargo clippy --all-targets` -> no warnings.
+  - `/sessions` (alias `/resume`) lists title, `2h ago · 14 msgs`, newest
+    first, with `*` on the open session. The reader counts lines and
+    parses only title candidates; 10,000 lines finish well under 1 s.
+    `Enter` opens and replays; `Ctrl+D` asks `y/n` and moves the file to
+    `sessions/<slug>/trash/`.
+  - `/new` (alias `/clear`) starts a fresh file and keeps the model and
+    mode. `/rename <name>` appends a `session_name` custom entry and
+    toasts `Session renamed to <name>`.
+  - `/tree` indents two spaces per level, caps at eight levels with `…`,
+    shows `role: first 60 chars`, and marks the current path with `*`.
+    `Enter` moves the leaf and rebuilds blocks from that path.
+    `Esc Esc` on an empty idle box opens the tree.
+  - `/fork` copies only the current path into a new file, switches to
+    it, and toasts `Forked`.
+  - `arqus -c` continues the latest session; `arqus -r` opens the
+    sessions picker at startup; no flag starts fresh.
+  - `/export [file]` writes Markdown (default
+    `arqus-session-<date>.md`) and toasts the path. `/copy` copies the
+    last assistant message through `pbcopy` or `wl-copy`/`xclip`.
+- Assumptions:
+  - A session with no user message and no rename is titled
+    `(empty session)` in the picker.
+  - The tree detail column was removed; entry ids were random and made
+    snapshots unstable. The row is exactly `role: preview`.
+  - Deleting the open session is refused with a warning; other sessions
+    move to `trash/`, never unlink.
+  - `-r` still creates the fresh session before the picker opens, so it
+    appears as the marked current row until another is chosen.
+- Known problems / TODO:
+  - The manual check must be done by the human: create two sessions,
+    switch with `/sessions`, branch with `/tree`, `/fork`, then
+    `arqus -c`.
+  - Clipboard tests only cover the command choice, not a real clipboard.
+- Next stage:
+  - T8 (modes and approvals in the TUI).
+
+## Stage T8: Modes and approvals in the TUI   [DONE]
+- Files created or changed:
+  - New: `src/tui/approval_tests.rs`; snapshots
+    `approval-{bash,write,edit,risky}-80x24` and
+    `footer-mode-{ask,auto,plan}-80x1`.
+  - Changed: `src/agent.rs` and `src/agent_safety.rs` (`plan` on
+    `AgentConfig`, `PLAN_REFUSAL`, the plan note in each request, the
+    plan gate before every non-read tool), `src/{main,print}.rs`
+    (`plan: false`; settings `approval = "auto"` starts the TUI in auto),
+    `src/tui/{facts,app,approval,commands,commands_tests,effects,events,
+    flow,flow_dialogs,keys,mod,msg,running,update,update_tests,view,
+    footer_tests,agent_tests}.rs`.
+  - Existing snapshots changed: none. `help-60x20` and `help-80x24`
+    stay as they were; Shift+Tab is still one key row.
+- What works (command + short real output):
+  - `cargo fmt && cargo check && cargo test` -> `518 passed; 0 failed`
+    in the unit run, then `4`, `2`, `9`, `2`, `12`, `4`, `15` in the
+    e2e files, `6 ignored` (live).
+  - `cargo clippy --all-targets -- -D warnings` -> no warnings.
+  - `Shift+Tab` and `/mode [ask|auto|plan]` cycle or set; the footer
+    chip and the editor border follow. The first switch to `auto` in a
+    session shows `auto: tools run without asking. Use a git branch or
+    the Docker sandbox.` once. A launch starts in `ask` unless `--yolo`
+    or settings has `approval: "auto"`.
+  - `plan` returns `Plan mode: changes are disabled. Describe the plan
+    instead.` for `write`, `edit` and `bash`; `read` still works, and
+    every request in plan mode carries the same line in its system
+    prompt.
+  - The approval dialog shows the tool title, wrapped preview (`bash`
+    stops at 10 body lines, `write` at 20), a red `RISKY` marker, and
+    `y`/`a`/`n`/`Esc`. It owns the keyboard until a decision. The running
+    line says `waiting for your approval`; the bell becomes an `Effect`
+    only after 100 idle ticks (10 s).
+  - The mock-provider tests drive the real agent loop through
+    `update`: `y` runs the command, `n` returns `The user denied this
+    tool call.`, `a` remembers that tool for the session, `Esc` sends
+    deny plus `Effect::Abort`.
+- Assumptions:
+  - The mode is applied to the engine by `Effect::SetMode`: `Ask` and
+    `Plan` use `Approver::Interactive`, `Auto` uses `Approver::Auto`.
+    The plan gate is separate and runs before approval.
+  - A turn that is already running keeps its cloned runtime, so a mode
+    change applies from the next prompt. The approval dialog cannot be
+    covered by another dialog.
+  - The bell is one `Effect` per idle approval request, not a timer in
+    `update`.
+- Known problems / TODO:
+  - The manual check must be done by the human: ask for a file edit in
+    `ask` mode and approve; deny a bash command; try `plan`; press
+    `Shift+Tab` through the modes.
+  - `AgentEvent::ApprovalRequest` keeps stage 22's `{tool, preview}`
+    shape because the approval channel handles one call at a time; it
+    has no `id` yet.
+- Next stage:
+  - T9 (themes, settings dialog, key overrides).
+
+
+## Stage T9: Themes, settings dialog, key overrides   [DONE]
+- Files created or changed:
+  - New: `src/tui/{theme_file,keybinds,flow_settings,flow_slash}.rs`,
+    `src/tui/{theme_file,keybinds}_tests.rs`,
+    `src/tui/overlay/{theme,settings}.rs` and their test files,
+    `src/settings_keybinds.rs`.
+  - Changed: `src/{state,settings,main}.rs`, `src/settings_tests.rs`,
+    `src/tui/{actions,keys,theme,commands,effects,flow,msg,mod,update,testing}.rs`,
+    `src/tui/{theme_tests,commands_tests,update_tests}.rs`,
+    `src/tui/overlay/mod.rs`.
+  - Snapshots added: `theme-picker-{80x24,60x20}` and
+    `settings-picker-{80x24,60x20}`.
+  - Snapshots changed: `help-60x20` and `help-80x24` (`/theme` and
+    `/settings` are now available, so the command column lists them).
+- What works (command + short real output):
+  - `cargo fmt && cargo check && cargo test` -> `544 passed; 0 failed`
+    in the unit run, then `4`, `2`, `9`, `2`, `12`, `4`, `15` in the
+    e2e files, `6 ignored` (live).
+  - `cargo clippy --all-targets -- -D warnings` -> no warnings.
+  - `/theme` lists `dark`, `light`, `mono`, `dark (256 colors)` and every
+    `<ARQUS_HOME>/themes/<name>.json`. Moving the selection previews;
+    `Enter` keeps the theme and writes `state.json`; `Esc` restores the
+    theme from before the dialog. Invalid files are skipped and a toast
+    names the file.
+  - Theme files use `#rrggbb`; missing colors use the dark palette.
+  - `/settings` shows the current value of theme, show thinking, expand
+    tool output, mouse capture, terminal bell, default mode and
+    compaction. `Enter` cycles or toggles one row and saves `state.json`.
+  - `settings.json` may hold `"keybinds"` with one key or an array.
+    Unknown action names and unparsable keys produce startup toasts and
+    are ignored; a shared key goes to the later action with a toast.
+    `/help` reads the effective key map.
+  - `NO_COLOR` starts in `mono`; `COLORTERM=truecolor` gives RGB;
+    a 256-color terminal routes every palette color through
+    `rgb_to_xterm256`. Drawing sources are checked for raw colors.
+- Assumptions:
+  - `settings.json` keybinds are merged with the built-ins at startup only;
+    a change needs a restart.
+  - `keybinds` order follows the sorted action map, so "later wins" means
+    later in that sorted order.
+  - Mouse capture and the finished-run bell timing are stored now; T10
+    uses the mouse flag, and `Msg::Done` rings the bell when the setting
+    is on.
+  - The compaction setting applies to the running engine immediately and
+    is restored from `state.json` at the next launch.
+- Known problems / TODO:
+  - The human must check the themes in Terminal.app (256 colors) and in a
+    truecolor terminal, and toggle each setting once.
+  - A theme file named like a built-in is listed twice in the picker.
+- Next stage:
+  - T10 (terminal robustness: restore, resize, clipboard, mouse, title).
+
+
+## Stage T10: Terminal robustness   [DONE]
+- Files created or changed:
+  - New: `src/tui/{terminal,resize}.rs` and their test files,
+    `src/tui/clipboard_tests.rs`.
+  - Changed: `src/tui/{mod,event_loop,msg,update,app,view,render,scroll,
+    block,effects,flow_settings,commands,clipboard,testing}.rs`,
+    `src/tui/{block,commands,update}_tests.rs`,
+    `src/tui/overlay/settings.rs`.
+  - Snapshots changed: `settings-picker-80x24` and `settings-picker-60x20`
+    (the hint now documents Shift-drag while mouse capture is on).
+    Both were new untracked files from T9; no other snapshot text changed.
+- What works (command + short real output):
+  - `cargo fmt && cargo check && cargo test` -> `562 passed; 0 failed`
+    in the unit run, then `4`, `2`, `9`, `2`, `12`, `4`, `15` in the
+    e2e files, `6 ignored` (live).
+  - `cargo clippy --all-targets -- -D warnings` -> no warnings.
+  - One guard restores on normal quit, an error from `event_loop`, and a
+    panic (hook restores first, then prints the panic). `restore()` is
+    idempotent; `TerminalGuard::finish` runs only the first time.
+  - SIGTERM and SIGHUP send `Msg::Signal`; a closed stdin stream sends the
+    same message; both return `Effect::Quit`.
+  - Resize is debounced at 50 ms, keeps the last size, clears the render
+    cache and puts the same block back at the top of the viewport.
+  - Clipboard tries `pbcopy` (macOS) or `wl-copy`, `xclip -selection
+    clipboard`, `xsel -b` (Linux), then writes OSC 52 with a hand-written
+    base64 encoder. `/copy code` copies the last fenced block of the last
+    answer.
+  - Mouse stays off unless `state.json` says on; wheel events scroll by
+    three lines. The title is `ESC ] 0 ; arqus · <folder> BEL` and is
+    reset on exit. Draws are capped at 30 fps while streaming, and the
+    transcript clones only the visible rows.
+  - The finished-run bell rings only after 10 idle seconds. Block text
+    cuts lines at 2,000 characters; invalid UTF-8 already reaches the UI
+    through `String::from_utf8_lossy`.
+- Assumptions:
+  - Resize debounce uses caller milliseconds, so its rule is a pure
+    function and the event loop owns the clock.
+  - "Anchor the scroll position" keeps the block and the line inside it
+    at the top; if that block got shorter, the scroll clamps to the end.
+  - OSC 52 is the last fallback even when it may be ignored: the copy is
+    reported as done, because no terminal can confirm acceptance.
+- Known problems / TODO:
+  - The human must run the manual check: `kill -TERM`, rapid resize, a
+    100,000 character line, `TERM=xterm`, `NO_COLOR=1`, and Shift-drag
+    with mouse capture on.
+- Next stage:
+  - T11 (tmux smoke tests and the acceptance checklist).
+
+## Stage T11: tmux smoke tests and the acceptance checklist   [DONE]
+- Files created or changed:
+  - New: `examples/fake_llm.rs`, `scripts/tui-smoke.sh`,
+    `scripts/tui-smoke-lib.sh` (the sourced helpers, both files stay under
+    300 lines), `docs/TUI_ACCEPTANCE.md`.
+  - Changed: `tests/support/mod.rs` (`FakeLlm::start_on`, runtime
+    `CARGO_BIN_EXE_arqus` lookup so the example can include the module),
+    `src/tui/update.rs` (a `Key OK` toast when a key is accepted),
+    `src/tui/update_tests.rs`.
+  - Snapshots changed: none.
+- What works (command + short real output):
+  - `tmux` was missing; installed it with `brew install tmux` (3.8).
+  - `sh scripts/tui-smoke.sh` -> `all scenarios passed` for a to h:
+    first run and filter, connect and key check, chat, approve a tool,
+    deny a tool, slash menu and palette, quit and secret scan, restart.
+  - The fake server is the in-process test server: `fake_llm <port>
+    <script.json>` prints `listening on <port>` and serves the JSON
+    script in order (`json`, `status`, `text`, `tool`).
+  - `cargo test` -> `563 passed; 0 failed` in the unit run, then the
+    e2e files pass; `6 ignored` (live).
+  - `cargo clippy --all-targets -- -D warnings` -> no warnings.
+  - `cargo fmt --check` and `sh -n scripts/tui-smoke.sh` -> clean.
+- Assumptions:
+  - The provider picker uses Esc once to clear a filter and once to
+    close, so the first-run scenario sends Esc twice. This matches T3.
+  - The Connect dialog switches to the model picker as soon as the key
+    is accepted; the `Key OK` confirmation is a toast so it stays
+    visible while the model list loads.
+  - Restart (scenario h) starts a fresh session like a normal launch:
+    the main view, saved model and no dialog. Continuing the old
+    session is covered by `-c` in T7.
+  - The smoke helpers are `start`, `keys`, `type`, `wait_for`, `screen`
+    and `stop`, all in the sourced `scripts/tui-smoke-lib.sh`; the fake
+    server picks a free port in 20000-39999.
+- Known problems / TODO:
+  - The human must run `docs/TUI_ACCEPTANCE.md` once (Terminal.app,
+    a truecolor terminal, glyph widths, scrolling, Option-as-Meta).
+- Next stage:
+  - The Part 4 gate and the v0.2.0 release checks.

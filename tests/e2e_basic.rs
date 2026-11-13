@@ -1,5 +1,5 @@
-//! Black-box tests: run the real `pirs` binary against a scripted fake server.
-//! No network and no real key: every run gets its own temp project and PIRS_HOME.
+//! Black-box tests: run the real `arqus` binary against a scripted fake server.
+//! No network and no real key: every run gets its own temp project and ARQUS_HOME.
 
 mod support;
 use support::*;
@@ -40,7 +40,7 @@ fn plain_reply_streams_text_and_sends_tools() {
     let home = TempDir::new("plain_home");
     let fake = FakeLlm::start(vec![Reply::sse(sse_text(&["Hel", "lo"]))]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -84,7 +84,7 @@ fn bash_tool_runs_and_result_is_sent_back() {
         Reply::sse(sse_text(&["done"])),
     ]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -114,7 +114,7 @@ fn unknown_tool_becomes_an_error_tool_message() {
         Reply::sse(sse_text(&["done"])),
     ]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -142,7 +142,7 @@ fn session_file_is_written_and_continue_replays_history() {
         Reply::sse(sse_text(&["second answer"])),
     ]);
 
-    let first = run_pirs(
+    let first = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -167,7 +167,7 @@ fn session_file_is_written_and_continue_replays_history() {
     assert!(roles.contains(&"user"), "roles: {roles:?}");
     assert!(roles.contains(&"assistant"), "roles: {roles:?}");
 
-    let second = run_pirs(
+    let second = run_arqus(
         &project.path,
         &home.path,
         &fake.url,

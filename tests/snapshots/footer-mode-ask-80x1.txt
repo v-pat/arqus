@@ -1,0 +1,1 @@
+ ~/code/my-project  main*   openrouter/deepseek/deepseek-v4-flash  ctx 12%  ask

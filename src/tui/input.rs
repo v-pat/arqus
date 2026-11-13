@@ -4,12 +4,9 @@
 //! `String` index is a byte position and breaks on non-ASCII text.
 
 use super::history::History;
+pub(super) use super::paste::marker_index;
 
-/// Built-in commands offered by the hint line and Tab completion.
-pub const COMMANDS: &[&str] = &[
-    "/compact", "/tree", "/fork", "/model", "/cost", "/budget", "/new", "/resume", "/help",
-    "/quit", "/exit",
-];
+pub use super::paste::{paste_label, LinePart};
 
 /// Prompt box contents plus the editing cursor.
 #[derive(Debug, Clone)]
@@ -21,6 +18,10 @@ pub struct InputState {
     /// `Some(i)` while walking history; `None` while editing the draft.
     pub(super) hist_index: Option<usize>,
     pub(super) draft: Vec<char>,
+    /// Full text of every collapsed paste, in marker order.
+    pub(super) pastes: Vec<String>,
+    /// Last killed text, for `Ctrl+Y`.
+    pub(super) yank: String,
 }
 
 impl InputState {
@@ -31,6 +32,8 @@ impl InputState {
             history: History::new(),
             hist_index: None,
             draft: Vec::new(),
+            pastes: Vec::new(),
+            yank: String::new(),
         }
     }
 
@@ -41,13 +44,26 @@ impl InputState {
         }
     }
 
+    /// The full text, with collapsed pastes expanded again.
     pub fn text(&self) -> String {
-        self.chars.iter().collect()
+        let mut out = String::with_capacity(self.chars.len());
+        for &c in &self.chars {
+            match marker_index(c) {
+                Some(index) => {
+                    if let Some(paste) = self.pastes.get(index) {
+                        out.push_str(paste);
+                    }
+                }
+                None => out.push(c),
+            }
+        }
+        out
     }
 
     pub fn set_text(&mut self, text: &str) {
         self.chars = text.chars().collect();
         self.cursor = self.chars.len();
+        self.pastes.clear();
         self.reset_nav();
     }
 
@@ -56,6 +72,7 @@ impl InputState {
         let text = self.text();
         self.chars.clear();
         self.cursor = 0;
+        self.pastes.clear();
         self.reset_nav();
         text
     }
@@ -63,6 +80,7 @@ impl InputState {
     pub fn clear(&mut self) {
         self.chars.clear();
         self.cursor = 0;
+        self.pastes.clear();
         self.reset_nav();
     }
 
@@ -151,35 +169,6 @@ impl InputState {
         self.cursor = self.line_end();
     }
 
-    /// Ctrl+W: delete the word before the cursor, whitespace first.
-    pub fn delete_word(&mut self) {
-        let mut start = self.cursor;
-        while start > 0 && self.chars[start - 1].is_whitespace() {
-            start -= 1;
-        }
-        while start > 0 && !self.chars[start - 1].is_whitespace() {
-            start -= 1;
-        }
-        self.chars.drain(start..self.cursor);
-        self.cursor = start;
-        self.reset_nav();
-    }
-
-    /// Ctrl+U: delete from the line start to the cursor.
-    pub fn kill_to_start(&mut self) {
-        let start = self.line_start();
-        self.chars.drain(start..self.cursor);
-        self.cursor = start;
-        self.reset_nav();
-    }
-
-    /// Ctrl+K: delete from the cursor to the line end, not the newline.
-    pub fn kill_to_end(&mut self) {
-        let end = self.line_end();
-        self.chars.drain(self.cursor..end);
-        self.reset_nav();
-    }
-
     /// Ctrl+J / Alt+Enter: insert a newline at the cursor.
     pub fn insert_newline(&mut self) {
         self.insert_char('\n');
@@ -236,46 +225,6 @@ impl InputState {
 
     pub fn remember(&mut self, text: &str) {
         self.history.remember(text);
-    }
-
-    fn slash_query(&self) -> Option<String> {
-        let text = self.text();
-        if !text.starts_with('/') || text.contains(['\n', ' ', '\t']) {
-            return None;
-        }
-        Some(text)
-    }
-
-    /// Commands that match what was typed after `/`.
-    pub fn slash_matches(&self) -> Vec<&'static str> {
-        let Some(query) = self.slash_query() else {
-            return Vec::new();
-        };
-        COMMANDS
-            .iter()
-            .copied()
-            .filter(|command| command.starts_with(&query))
-            .collect()
-    }
-
-    /// One-line hint under the box, or `None`.
-    pub fn hint(&self) -> Option<String> {
-        let matches = self.slash_matches();
-        if matches.is_empty() {
-            None
-        } else {
-            Some(matches.join("  "))
-        }
-    }
-
-    /// Tab: complete when exactly one command matches. Returns true if it did.
-    pub fn tab_complete(&mut self) -> bool {
-        let matches = self.slash_matches();
-        if matches.len() != 1 {
-            return false;
-        }
-        self.set_text(matches[0]);
-        true
     }
 }
 

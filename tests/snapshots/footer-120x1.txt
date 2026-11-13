@@ -1,0 +1,1 @@
+ ~/code/my-project  main*  ? shortcuts                      openrouter/deepseek/deepseek-v4-flash  ctx 12%  $0.004  ask

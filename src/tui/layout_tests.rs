@@ -1,4 +1,4 @@
-use super::{format_timestamp, visible_window};
+use super::{format_timestamp, relative_to, visible_window};
 
 #[test]
 fn window_keeps_the_top_visible() {
@@ -27,4 +27,13 @@ fn window_shrinks_when_the_list_is_short() {
 fn timestamps_are_utc() {
     assert_eq!(format_timestamp(0), "1970-01-01 00:00");
     assert_eq!(format_timestamp(1_700_000_000), "2023-11-14 22:13");
+}
+
+#[test]
+fn relative_times_use_short_units() {
+    let now = 10_000_000;
+    assert_eq!(relative_to(now, now - 5), "just now");
+    assert_eq!(relative_to(now, now - 300), "5m ago");
+    assert_eq!(relative_to(now, now - 2 * 3_600), "2h ago");
+    assert_eq!(relative_to(now, now - 3 * 86_400), "3d ago");
 }

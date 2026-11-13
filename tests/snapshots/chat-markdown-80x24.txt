@@ -1,0 +1,24 @@
+┃ fix the failing test in util.py
+I'll run the tests first.
+
+Plan
+
+• run cargo test
+• edit util.py
+
+│ return text.lower().replace(" ", "-")
+
+Done.
+
+
+
+
+
+
+
+
+
+┌ prompt ──────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+ /tmp                               openrouter/test-model  ctx 12%  $0.004  ask

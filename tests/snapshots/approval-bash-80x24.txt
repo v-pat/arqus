@@ -1,0 +1,24 @@
+┃ change the build
+
+
+
+
+
+
+
+
+    ┌ Run command? ────────────────────────────────────────────────────────┐
+    │ cargo build --release && ./target/release/arqus --help               │
+    │                                                                      │
+    │ y allow once · a always allow bash · n deny · esc stop run           │
+    └──────────────────────────────────────────────────────────────────────┘
+
+
+
+
+ waiting for your approval
+ approval needed: bash
+┌ prompt ──────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+ /tmp                                        openrouter/test-model  ctx 0%  ask

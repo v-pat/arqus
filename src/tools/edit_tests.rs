@@ -11,7 +11,7 @@ static COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn temp_file(name: &str, content: &str) -> PathBuf {
     let n = COUNTER.fetch_add(1, Ordering::SeqCst);
-    let dir = std::env::temp_dir().join(format!("pirs_edit_{}_{}", std::process::id(), n));
+    let dir = std::env::temp_dir().join(format!("arqus_edit_{}_{}", std::process::id(), n));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(name);
     std::fs::write(&path, content).unwrap();

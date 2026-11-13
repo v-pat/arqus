@@ -16,7 +16,7 @@ fn cfg() -> ModelConfig {
 fn attribution_headers_are_optional_and_named() {
     assert_eq!(
         headers_for(None, None),
-        vec![("X-Title", "pirs".to_string())]
+        vec![("X-Title", "arqus".to_string())]
     );
     assert_eq!(
         headers_for(Some("https://example.com"), Some("my app")),
@@ -27,7 +27,7 @@ fn attribution_headers_are_optional_and_named() {
     );
     assert_eq!(
         headers_for(Some("  "), Some(" ")),
-        vec![("X-Title", "pirs".to_string())]
+        vec![("X-Title", "arqus".to_string())]
     );
 }
 

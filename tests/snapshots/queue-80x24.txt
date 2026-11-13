@@ -1,0 +1,24 @@
+┃ make the tests pass
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ⠼ Working... 0s · esc to interrupt
+ running
+ queued: first follow-up
+ queued: second follow-up
+┌ prompt ──────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+ ~/code/my-project           openrouter/deepseek/deepseek-v4-flash  ctx 0%  ask

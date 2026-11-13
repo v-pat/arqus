@@ -47,6 +47,15 @@ impl Runtime {
     /// Later requests read neutral messages, so mixed-provider history works.
     pub fn switch_model(&mut self, session: &mut Session, spec: &str) -> Result<()> {
         let cfg = crate::ai::ModelConfig::from_model_spec(spec)?;
+        self.apply_model(session, cfg)
+    }
+
+    /// Apply a fully resolved config and record the change in the session.
+    pub fn apply_model(
+        &mut self,
+        session: &mut Session,
+        cfg: crate::ai::ModelConfig,
+    ) -> Result<()> {
         session.append(EntryKind::ModelChange {
             provider: cfg.provider.clone(),
             model: cfg.model.clone(),

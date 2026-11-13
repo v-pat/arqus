@@ -59,7 +59,7 @@ pub fn draw<T: Clone>(
                         item,
                         &positions,
                         is_selected,
-                        width as usize,
+                        inner.width as usize,
                         theme,
                     ));
                 }
@@ -76,12 +76,13 @@ pub fn draw<T: Clone>(
     };
     frame.render_widget(Paragraph::new(Text::from(lines)), list);
 
-    let status = picker.status.clone().unwrap_or_else(|| hint.to_string());
-    let line = Line::from(format!(" {status}")).style(Style::default().fg(theme.dim));
-    frame.render_widget(
-        Paragraph::new(line),
-        row_area(inner, inner.height.saturating_sub(1)),
-    );
+    if let Some(status) = &picker.status {
+        let line = Line::from(format!(" {status}")).style(Style::default().fg(theme.dim));
+        frame.render_widget(
+            Paragraph::new(line),
+            row_area(inner, inner.height.saturating_sub(1)),
+        );
+    }
 }
 
 fn row_area(area: Rect, offset: u16) -> Rect {
@@ -107,7 +108,7 @@ fn item_line<T: Clone>(
             style
         }
     };
-    let check = if item.current { "✓ " } else { "  " };
+    let check = if item.current { "* " } else { "  " };
     let prefix = format!(" {check}");
     let mut spans = vec![Span::styled(prefix.clone(), style_for(theme.success))];
     for (index, ch) in item.label.chars().enumerate() {

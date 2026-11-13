@@ -53,6 +53,26 @@ pub fn resume_time(path: &Path) -> String {
         .unwrap_or_default()
 }
 
+/// `just now`, `5m ago`, `2h ago`, `3d ago` for the sessions picker.
+pub fn relative_time(modified: u64) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(modified);
+    relative_to(now, modified)
+}
+
+/// Pure form of `relative_time`, so the wording can be tested.
+pub fn relative_to(now: u64, modified: u64) -> String {
+    let secs = now.saturating_sub(modified);
+    match secs {
+        0..=59 => "just now".to_string(),
+        60..=3_599 => format!("{}m ago", secs / 60),
+        3_600..=86_399 => format!("{}h ago", secs / 3_600),
+        _ => format!("{}d ago", secs / 86_400),
+    }
+}
+
 #[cfg(test)]
 #[path = "layout_tests.rs"]
 mod tests;

@@ -16,7 +16,7 @@ impl App {
             return;
         }
         self.wrap_width = width;
-        self.refresh_wrap();
+        self.refresh_render();
         if self.follow {
             self.follow_bottom();
         } else {
@@ -64,21 +64,21 @@ impl App {
                 }
             }
         }
+        self.prune_toasts();
     }
 
     pub fn spinner(&self) -> &'static str {
-        const FRAMES: [&str; 4] = ["|", "/", "-", "\\"];
-        FRAMES[(self.ticks % 4) as usize]
+        const FRAMES: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+        FRAMES[(self.ticks % FRAMES.len() as u64) as usize]
     }
 
     pub fn elapsed_secs(&self) -> u64 {
         self.elapsed_ticks / 10
     }
 
-    fn bottom_scroll(&self) -> usize {
+    pub(super) fn bottom_scroll(&self) -> usize {
         self.wrapped.len().saturating_sub(self.page)
     }
-
     pub(super) fn follow_bottom(&mut self) {
         if self.follow {
             self.scroll = self.bottom_scroll();

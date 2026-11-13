@@ -58,8 +58,21 @@ pub struct AgentConfig {
     pub limits: Limits,
     pub approver: Approver, // approvals, path rules and the risky switch
     pub allow_risky: bool,
+    /// True in plan mode: write, edit and bash return `PLAN_REFUSAL`.
+    pub plan: bool,
     pub approvals: Approvals,
     pub guard: Guard,
+}
+
+impl AgentConfig {
+    /// The system prompt for one request. Plan mode adds one line.
+    pub fn turn_system_prompt(&self) -> String {
+        if self.plan {
+            format!("{}\n{}", self.system_prompt, PLAN_NOTE)
+        } else {
+            self.system_prompt.clone()
+        }
+    }
 }
 
 #[path = "runtime.rs"]
@@ -70,6 +83,9 @@ pub use runtime::Runtime;
 mod safety_flow;
 #[path = "agent_util.rs"]
 mod util;
+pub use safety_flow::PLAN_NOTE;
+#[cfg(test)]
+pub use safety_flow::{preview as approval_preview, PLAN_REFUSAL};
 #[cfg(test)]
 use util::drain_steering;
 use util::{accumulated, is_context_overflow, parts, Runaway};
@@ -106,7 +122,7 @@ pub async fn run_prompt(
 
         let messages = build_context(&session.entries, session.leaf_id.as_deref());
         let request = LlmRequest {
-            system: cfg.system_prompt.clone(),
+            system: cfg.turn_system_prompt(),
             messages,
             tools: tools::tool_defs(),
             max_tokens: Some(cfg.limits.max_output_tokens),

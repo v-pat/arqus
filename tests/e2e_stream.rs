@@ -1,5 +1,5 @@
 //! Stage 14: nasty stream shapes. Black-box tests against the fake server.
-//! No network, no real key: every run gets its own temp project and PIRS_HOME.
+//! No network, no real key: every run gets its own temp project and ARQUS_HOME.
 
 mod support;
 use support::*;
@@ -74,7 +74,7 @@ fn event_cut_in_the_middle_of_data_prefix() {
         delay_ms: 30,
     }]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -106,7 +106,7 @@ fn multi_byte_character_cut_across_writes() {
         delay_ms: 30,
     }]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -136,7 +136,7 @@ fn comment_lines_are_ignored() {
     }
     let fake = FakeLlm::start(vec![Reply::sse(chunks)]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -154,7 +154,7 @@ fn crlf_line_endings_parse() {
     let home = TempDir::new("crlf_home");
     let fake = FakeLlm::start(vec![Reply::sse(to_crlf(sse_text(&["Hello"])))]);
 
-    let out = run_pirs(
+    let out = run_arqus(
         &project.path,
         &home.path,
         &fake.url,
@@ -190,7 +190,7 @@ fn openrouter_usage_chunk_splits_cached_tokens() {
         sse_done(),
     ])]);
 
-    let out = run_pirs(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
+    let out = run_arqus(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
 
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     assert_usage_split(&home.path);
@@ -209,7 +209,7 @@ fn openai_empty_choices_usage_chunk_splits_cached_tokens() {
         sse_done(),
     ])]);
 
-    let out = run_pirs(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
+    let out = run_arqus(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
 
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     assert_usage_split(&home.path);
@@ -224,7 +224,7 @@ fn stream_ends_after_finish_reason_without_done_is_success() {
         sse_event(&finish_chunk("stop")),
     ])]);
 
-    let out = run_pirs(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
+    let out = run_arqus(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
 
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     assert!(stdout(&out).contains("Hello"), "stdout: {}", stdout(&out));
@@ -238,7 +238,7 @@ fn stream_cut_without_finish_saves_partial_text_as_error() {
     let home = TempDir::new("cut_stream_home");
     let fake = FakeLlm::start(vec![Reply::sse(vec![sse_event(&content_chunk("par"))])]);
 
-    let out = run_pirs(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
+    let out = run_arqus(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
 
     let err = stderr(&out);
     assert!(
@@ -267,7 +267,7 @@ fn mid_stream_error_after_text_is_reported() {
         sse_event(&error_chunk()),
     ])]);
 
-    let out = run_pirs(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
+    let out = run_arqus(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
 
     let err = stderr(&out);
     assert!(err.contains("Provider disconnected"), "stderr: {err:?}");
@@ -281,7 +281,7 @@ fn mid_stream_error_as_first_event_is_reported() {
     let home = TempDir::new("stream_err_first_home");
     let fake = FakeLlm::start(vec![Reply::sse(vec![sse_event(&error_chunk())])]);
 
-    let out = run_pirs(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
+    let out = run_arqus(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
 
     let err = stderr(&out);
     assert!(err.contains("Provider disconnected"), "stderr: {err:?}");
@@ -298,7 +298,7 @@ fn empty_tool_arguments_are_an_empty_object() {
         Reply::sse(sse_text(&["done"])),
     ]);
 
-    let out = run_pirs(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
+    let out = run_arqus(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
 
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     assert_eq!(fake.requests().len(), 2, "unexpected extra requests");
@@ -324,7 +324,7 @@ fn invalid_tool_arguments_become_an_error_and_the_loop_continues() {
         Reply::sse(sse_text(&["recovered"])),
     ]);
 
-    let out = run_pirs(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
+    let out = run_arqus(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
 
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     assert!(
@@ -379,7 +379,7 @@ fn two_interleaved_tool_calls_both_run_in_index_order() {
         Reply::sse(sse_text(&["done"])),
     ]);
 
-    let out = run_pirs(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
+    let out = run_arqus(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
 
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     assert!(project.path.join("a.txt").exists(), "a.txt missing");
@@ -420,7 +420,7 @@ fn chunk_without_choices_is_ignored() {
         sse_done(),
     ])]);
 
-    let out = run_pirs(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
+    let out = run_arqus(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
 
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     assert!(stdout(&out).contains("Hello"), "stdout: {}", stdout(&out));
@@ -441,7 +441,7 @@ fn reasoning_fields_become_thinking_blocks_and_stay_off_stdout() {
         sse_done(),
     ])]);
 
-    let out = run_pirs(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
+    let out = run_arqus(&project.path, &home.path, &fake.url, &["-p", "hi"], &[]);
 
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     let text = stdout(&out);

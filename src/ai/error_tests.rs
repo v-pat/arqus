@@ -131,7 +131,7 @@ fn display_is_the_friendly_line() {
     let err = LlmError::Auth("401 Missing key".to_string());
     assert_eq!(
         err.to_string(),
-        "Authentication failed (401). Check PIRS_API_KEY."
+        "Authentication failed (401). Check ARQUS_API_KEY."
     );
     let limited = LlmError::RateLimited {
         retry_after_secs: None,

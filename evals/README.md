@@ -1,6 +1,6 @@
-# pirs evals
+# arqus evals
 
-Small, deterministic coding tasks that measure whether `pirs` can actually do
+Small, deterministic coding tasks that measure whether `arqus` can actually do
 the job. The runner uses only the Python 3 standard library. The tasks use only
 `python3` and `sh`, and never touch the network.
 
@@ -13,7 +13,7 @@ evals/
   BASELINE.md            first paid run: pass count, cost, failures
   CHANGELOG.md           every tuning change and its result
   tasks/<name>/
-    prompt.txt           sent to pirs with -p
+    prompt.txt           sent to arqus with -p
     setup/               copied into a fresh temp folder
     check.sh             exit 0 means pass; runs inside that folder
 ```
@@ -22,11 +22,11 @@ The runner copies `setup/` into a fresh temp folder, runs `git init` and commits
 it, then runs:
 
 ```
-pirs --no-session --yolo -p "<prompt>"
+arqus --no-session --yolo -p "<prompt>"
 ```
 
-with `PIRS_HOME` pointed at a throwaway folder. After the run it executes
-`check.sh` in the same folder. `PIRS_OUT` points at the saved stdout.
+with `ARQUS_HOME` pointed at a throwaway folder. After the run it executes
+`check.sh` in the same folder. `ARQUS_OUT` points at the saved stdout.
 
 Every `check.sh` must fail on the untouched `setup/`. That is how a broken check
 is caught.
@@ -43,9 +43,9 @@ Set the provider, model and key in your own terminal. The key is never read,
 printed or stored by the runner:
 
 ```
-export PIRS_PROVIDER=openrouter
-export PIRS_MODEL=<model id>
-export PIRS_API_KEY=<your key>
+export ARQUS_PROVIDER=openrouter
+export ARQUS_MODEL=<model id>
+export ARQUS_API_KEY=<your key>
 ```
 
 Run two tasks:
@@ -72,8 +72,8 @@ Flags:
 |---|---|
 | `--tasks a,b` | Only these tasks (default: all) |
 | `--repeat N` | Run every selected task N times |
-| `--bin path` | Binary to test (default: `target/release/pirs`) |
-| `--model spec` | Optional `provider:model`, passed as `--model`; otherwise pirs uses `PIRS_MODEL` |
+| `--bin path` | Binary to test (default: `target/release/arqus`) |
+| `--model spec` | Optional `provider:model`, passed as `--model`; otherwise arqus uses `ARQUS_MODEL` |
 
 The runner stops the whole run when the summed reported cost exceeds
 `EVAL_MAX_COST` (default `0.50` dollars). Each task has a 300 s wall-clock
@@ -88,7 +88,7 @@ Each run appends one line to `results.jsonl`:
 
 The final table shows task, pass rate, average seconds, average cost and a
 total line. The exit code is 0 only when every run passed. The `model` field is
-`--model` when given, otherwise `PIRS_MODEL`, otherwise `default`.
+`--model` when given, otherwise `ARQUS_MODEL`, otherwise `default`.
 
 ## Tasks
 

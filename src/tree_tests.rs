@@ -3,7 +3,7 @@ use crate::session::new_id;
 use crate::types::{Message, StopReason};
 
 fn tmp() -> std::path::PathBuf {
-    std::env::temp_dir().join(format!("pirs_tree_{}", new_id()))
+    std::env::temp_dir().join(format!("arqus_tree_{}", new_id()))
 }
 
 fn user(text: &str) -> EntryKind {

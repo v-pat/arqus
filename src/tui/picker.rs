@@ -3,6 +3,7 @@
 //! and draws the rows; the key handler maps real key events to `PKey`.
 
 use super::fuzzy::{filter_sort, Match};
+use super::keys::{Key, KeyCodeX};
 
 #[derive(Clone, Debug)]
 pub struct Item<T: Clone> {
@@ -116,6 +117,16 @@ impl<T: Clone> Picker<T> {
 
     pub fn match_count(&self) -> usize {
         self.matches.len()
+    }
+
+    /// Highlight the last match, used for the "use this id" row.
+    pub fn select_last(&mut self) {
+        self.cursor = self.matches.len().saturating_sub(1);
+    }
+
+    /// Highlight match `index`, clamped to the list.
+    pub fn select_index(&mut self, index: usize) {
+        self.cursor = index.min(self.matches.len().saturating_sub(1));
     }
 
     /// Index into `items` of the highlighted row.
@@ -240,6 +251,24 @@ impl<T: Clone> Picker<T> {
         }
         PickerEvent::None
     }
+}
+
+/// Map one TUI key to the picker state machine.
+pub fn to_pkey(key: Key) -> Option<PKey> {
+    Some(match key.code {
+        KeyCodeX::Up => PKey::Up,
+        KeyCodeX::Down => PKey::Down,
+        KeyCodeX::PageUp => PKey::PageUp,
+        KeyCodeX::PageDown => PKey::PageDown,
+        KeyCodeX::Home => PKey::Home,
+        KeyCodeX::End => PKey::End,
+        KeyCodeX::Enter => PKey::Enter,
+        KeyCodeX::Esc => PKey::Esc,
+        KeyCodeX::Backspace => PKey::Backspace,
+        KeyCodeX::Char('u') if key.ctrl => PKey::ClearQuery,
+        KeyCodeX::Char(c) if !key.ctrl && !key.alt => PKey::Char(c),
+        _ => return None,
+    })
 }
 
 #[cfg(test)]

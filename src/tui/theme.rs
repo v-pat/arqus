@@ -141,7 +141,11 @@ pub struct Theme {
 
 impl Theme {
     pub fn from_env() -> Theme {
-        Theme::dark(ColorDepth::from_env())
+        let depth = ColorDepth::from_env();
+        if depth == ColorDepth::None {
+            return Theme::mono();
+        }
+        Theme::dark(depth)
     }
 
     pub fn dark(depth: ColorDepth) -> Theme {
@@ -166,7 +170,7 @@ impl Theme {
         }
     }
 
-    fn build(name: &str, depth: ColorDepth, p: &Palette) -> Theme {
+    pub(crate) fn build(name: &str, depth: ColorDepth, p: &Palette) -> Theme {
         let c = |rgb: (u8, u8, u8)| match depth {
             ColorDepth::True => Color::Rgb(rgb.0, rgb.1, rgb.2),
             ColorDepth::Indexed256 => Color::Indexed(rgb_to_xterm256(rgb.0, rgb.1, rgb.2)),
@@ -196,23 +200,30 @@ impl Theme {
     }
 }
 
-struct Palette {
-    fg: (u8, u8, u8),
-    dim: (u8, u8, u8),
-    accent: (u8, u8, u8),
-    user: (u8, u8, u8),
-    assistant: (u8, u8, u8),
-    thinking: (u8, u8, u8),
-    tool: (u8, u8, u8),
-    success: (u8, u8, u8),
-    warning: (u8, u8, u8),
-    error: (u8, u8, u8),
-    border: (u8, u8, u8),
-    border_focus: (u8, u8, u8),
-    selection: (u8, u8, u8),
-    diff_add: (u8, u8, u8),
-    diff_del: (u8, u8, u8),
-    code_bg: (u8, u8, u8),
+#[derive(Clone, Copy)]
+pub(crate) struct Palette {
+    pub(crate) fg: (u8, u8, u8),
+    pub(crate) dim: (u8, u8, u8),
+    pub(crate) accent: (u8, u8, u8),
+    pub(crate) user: (u8, u8, u8),
+    pub(crate) assistant: (u8, u8, u8),
+    pub(crate) thinking: (u8, u8, u8),
+    pub(crate) tool: (u8, u8, u8),
+    pub(crate) success: (u8, u8, u8),
+    pub(crate) warning: (u8, u8, u8),
+    pub(crate) error: (u8, u8, u8),
+    pub(crate) border: (u8, u8, u8),
+    pub(crate) border_focus: (u8, u8, u8),
+    pub(crate) selection: (u8, u8, u8),
+    pub(crate) diff_add: (u8, u8, u8),
+    pub(crate) diff_del: (u8, u8, u8),
+    pub(crate) code_bg: (u8, u8, u8),
+}
+
+impl Palette {
+    pub(crate) fn dark() -> Palette {
+        DARK
+    }
 }
 
 static DARK: Palette = Palette {

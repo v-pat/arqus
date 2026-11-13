@@ -15,8 +15,12 @@ fn temp_dir() -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let dir =
-        std::env::temp_dir().join(format!("pirs_tools_{}_{}_{}", std::process::id(), nanos, n));
+    let dir = std::env::temp_dir().join(format!(
+        "arqus_tools_{}_{}_{}",
+        std::process::id(),
+        nanos,
+        n
+    ));
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }

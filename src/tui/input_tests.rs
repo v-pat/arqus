@@ -142,27 +142,6 @@ fn paste_keeps_newlines_and_never_submits() {
 }
 
 #[test]
-fn tab_completes_only_one_match() {
-    let mut state = input("/he");
-    assert!(state.tab_complete());
-    assert_eq!(state.text(), "/help");
-
-    let mut state = input("/co");
-    assert!(!state.tab_complete());
-    assert_eq!(state.text(), "/co");
-}
-
-#[test]
-fn slash_hints_follow_the_typed_prefix() {
-    let state = input("/co");
-    assert_eq!(state.hint().as_deref(), Some("/compact  /cost"));
-    assert!(input("/co x").hint().is_none());
-    assert!(input("hello").hint().is_none());
-    assert!(input("/nope").hint().is_none());
-    assert_eq!(input("/").slash_matches().len(), COMMANDS.len());
-}
-
-#[test]
 fn view_scrolls_to_keep_the_cursor_visible() {
     let state = input("1\n2\n3\n4\n5\n6\n7\n8");
     assert_eq!(state.view(6), (2, 8));
@@ -185,4 +164,85 @@ fn word_moves_skip_whitespace_and_punctuation() {
     assert_eq!(state.cursor(), 4);
     state.word_right();
     assert_eq!(state.cursor(), 9);
+}
+
+#[test]
+fn ctrl_k_then_yank_restores_the_line_end() {
+    let mut state = input("hello world");
+    state.home();
+    state.move_right();
+    state.move_right();
+    state.kill_to_end();
+    assert_eq!(state.text(), "he");
+    state.yank();
+    assert_eq!(state.text(), "hello world");
+    assert_eq!(state.cursor(), 11);
+}
+
+#[test]
+fn ctrl_u_and_ctrl_w_are_yankable_too() {
+    let mut state = input("one two three");
+    state.delete_word();
+    assert_eq!(state.text(), "one two ");
+    state.yank();
+    assert_eq!(state.text(), "one two three");
+
+    let mut state = input("keep drop");
+    state.end();
+    state.move_left();
+    state.move_left();
+    state.move_left();
+    state.move_left();
+    state.kill_to_start();
+    assert_eq!(state.text(), "drop");
+    state.yank();
+    assert_eq!(state.text(), "keep drop");
+}
+
+#[test]
+fn a_large_paste_shows_one_marker_but_keeps_the_text() {
+    let big = "line\n".repeat(900);
+    let mut state = InputState::new();
+    state.insert_paste(&big);
+    assert_eq!(state.text(), big);
+    assert_eq!(state.line_count(), 1);
+    assert_eq!(
+        state.line_parts(0),
+        vec![LinePart::Paste(big.chars().count())]
+    );
+    assert_eq!(
+        super::paste_label(big.chars().count()),
+        "[pasted 4,500 characters]"
+    );
+}
+
+#[test]
+fn a_small_paste_is_inserted_exactly() {
+    let mut state = InputState::new();
+    state.insert_paste("short\ntext");
+    assert_eq!(
+        state.line_parts(0),
+        vec![LinePart::Text("short".to_string())]
+    );
+    assert_eq!(state.line_text(1), "text");
+}
+
+#[test]
+fn deleting_the_paste_marker_removes_the_whole_paste() {
+    let mut state = InputState::new();
+    state.insert_paste(&"z".repeat(3000));
+    state.backspace();
+    assert_eq!(state.text(), "");
+    state.insert_char('a');
+    assert_eq!(state.text(), "a");
+}
+
+#[test]
+fn paste_label_groups_thousands() {
+    assert_eq!(super::paste_label(4210), "[pasted 4,210 characters]");
+    assert_eq!(super::paste_label(999), "[pasted 999 characters]");
+    assert_eq!(
+        super::paste_label(1_000_000),
+        "[pasted 1,000,000 characters]"
+    );
 }

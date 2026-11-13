@@ -2,7 +2,7 @@
 
 ## A1. Mission
 
-We are building `pirs`: a minimal terminal coding agent in Rust, modeled on **pi**.
+We are building `arqus`: a minimal terminal coding agent in Rust, modeled on **pi**.
 
 What pi is (facts to copy as ideas, never copy its source or its prompts):
 - Tiny core. System prompt under about 1000 tokens. Four tools: `read`, `write`, `edit`, `bash`. Everything else is optional.
@@ -193,7 +193,7 @@ This format is inspired by pi's but is our own and is not byte-compatible with i
 
 ## A8. The pi ideas we implement (design decisions)
 
-1. **Session = JSONL, append only.** One header line, then one entry per line. Each entry has `id` and `parent_id`. The leaf is the LAST line of the file. To branch, move the in-memory leaf to an older id and append: the new entry becomes the last line, so the branch persists. History is never deleted, even after compaction. Session files live in `~/.pirs/sessions/<project-slug>/<ts>_<id>.jsonl`, where the slug is the cwd with `/` and `.` replaced by `-`.
+1. **Session = JSONL, append only.** One header line, then one entry per line. Each entry has `id` and `parent_id`. The leaf is the LAST line of the file. To branch, move the in-memory leaf to an older id and append: the new entry becomes the last line, so the branch persists. History is never deleted, even after compaction. Session files live in `~/.arqus/sessions/<project-slug>/<ts>_<id>.jsonl`, where the slug is the cwd with `/` and `.` replaced by `-`.
 2. **Context is a pure function.** `build_context(entries, leaf) -> Vec<Message>`: walk from the leaf to the root, reverse, apply the latest compaction (summary message plus kept messages), turn `branch_summary` entries into user messages, skip `model_change` and `custom` entries, then `sanitize`. Nothing else is allowed to decide what the model sees.
 3. **Sanitize rules.** Every tool call must be followed by its tool result. A missing result gets a synthetic error result ("interrupted"). A result without a call is dropped. An assistant message that failed or was aborted and has no content is dropped.
 4. **Adapters convert at the edge.** The neutral `Message` is converted to a provider's wire format only inside `ai/`. Adapters own provider quirks: tool-call id rules, thinking blocks, merging tool results. This is what lets one session contain messages from many providers.
@@ -249,18 +249,18 @@ run_prompt(session, llm, user_text):
 | Layer | What | Runs with | Network | Cost |
 |---|---|---|---|---|
 | L1 unit | pure functions, temp folders | `cargo test` | no | 0 |
-| L2 e2e | the real `pirs` binary against the fake LLM server (`tests/e2e_*.rs`) | `cargo test` | local only | 0 |
+| L2 e2e | the real `arqus` binary against the fake LLM server (`tests/e2e_*.rs`) | `cargo test` | local only | 0 |
 | L3 live | real OpenRouter, tiny requests (`tests/live_*.rs`, all `#[ignore]`) | `cargo test --test live_openrouter -- --ignored --test-threads=1` | yes | cents |
 | L4 evals | small coding tasks with pass/fail (`evals/`) | `python3 evals/run.py` | yes | cents |
 
-Default `cargo test` runs L1 and L2 only. It must NEVER need a network, a real key, or the real `~/.pirs`.
+Default `cargo test` runs L1 and L2 only. It must NEVER need a network, a real key, or the real `~/.arqus`.
 
 ## A14. Cost and secrets rules
 
 1. Never write an API key to a file, a log line, a test, a commit or a message. Debug logs must redact it (stage 12).
 2. Live tests send at most 3 requests each, with `max_tokens` of 300 or less, and fail if one test costs more than 0.05 dollars.
 3. Never put a live call in a loop without a hard cap on iterations and on cost.
-4. Environment variables that tests may set: `PIRS_HOME`, `PIRS_RETRY_BASE_MS`, `PIRS_MAX_RETRIES`, `PIRS_IDLE_TIMEOUT_SECS`, `PIRS_MAX_OUTPUT_TOKENS`, `PIRS_DEBUG`. Live-only: `PIRS_LIVE`, `PIRS_LIVE_MODEL`.
+4. Environment variables that tests may set: `ARQUS_HOME`, `ARQUS_RETRY_BASE_MS`, `ARQUS_MAX_RETRIES`, `ARQUS_IDLE_TIMEOUT_SECS`, `ARQUS_MAX_OUTPUT_TOKENS`, `ARQUS_DEBUG`. Live-only: `ARQUS_LIVE`, `ARQUS_LIVE_MODEL`.
 
 ## A15. Bug protocol
 
@@ -286,3 +286,46 @@ When you find a bug (a human report or a live failure): 1) write a test that fai
 > Read AGENTS.md (including the A13 to A18 addendum) and PROGRESS.md first. Do ONLY the stage below. Follow the IRON RULES. If a file I mention exists, read it and extend it. Every bug fix needs a test first (A15).
 
 ---
+
+## A19. Architecture (the rule that keeps a big TUI manageable)
+
+Use the Elm pattern: ONE state, ONE message type, a PURE update function, a render function.
+
+```
+src/tui/
+  mod.rs        run(): terminal setup and restore, the event loop, the effect executor
+  app.rs        struct App: ALL UI state (transcript, input, overlays, toasts, mode, footer facts)
+  msg.rs        enum Msg (things that happen) and enum Effect (things to do)
+  update.rs     fn update(app: &mut App, msg: Msg) -> Vec<Effect>     (pure, no IO, no await)
+  view.rs       fn view(app: &mut App, frame: &mut Frame)             (draws; no state changes except caches)
+  keys.rs       crossterm KeyEvent -> Key; the KeyMap (Key -> Action) with the defaults from section 1.3
+  theme.rs      Theme, built-ins, ColorDepth, rgb_to_xterm256()
+  overlay/      one file per dialog: connect, models, palette, help, approval, sessions, tree, theme, settings
+  widgets/      dialog, picker_view, transcript, footer, editor, toast, markdown, diff
+  testing.rs    #[cfg(test)] snapshot and key-replay helpers
+```
+Pure logic that does not need ratatui goes in plain modules (`fuzzy.rs`, `picker.rs`, `auth.rs`, `catalog.rs`, `models.rs` come from the starter) so it can be tested without a screen.
+
+## A20. Rules for TUI code
+
+1. `update()` never does IO, never awaits, never sleeps. When something must happen in the world (save a file, call the network, start the agent) it returns an `Effect`. The effect executor in `mod.rs` performs it and sends the result back as a `Msg`. Rust note: this is why every flow can be unit-tested without a terminal or a network.
+2. The event loop never blocks. Use `tokio::select!` over: terminal events, the `Msg` channel, and a tick timer. Tick at 100 ms only while a spinner or toast is active; otherwise wait for events. Redraw only when `app.dirty` is set.
+3. Every dialog is an `Overlay` variant with `handle_key(&mut self, key) -> OverlayOutcome` and a draw function. A stack of overlays is allowed; `Esc` pops one.
+4. All colors come from `Theme`. No `Color::Rgb` or `Color::Red` outside `theme.rs`.
+5. Measure text with `unicode-width`, never `.len()` or `.chars().count()`, when you compute layout.
+6. User input never causes a panic: no `unwrap` or index-out-of-range on anything typed, pasted or received from the network.
+7. Never print, log or draw a secret. Masked input stores the real value in memory only; the screen gets bullets.
+8. Check the installed ratatui and crossterm versions before writing drawing code (rule 5 of the IRON RULES). The API names changed between versions (`frame.area()` vs `frame.size()`, `ratatui::init()`, the cursor call).
+9. Each stage ends with: unit tests, snapshot tests for every new screen at 80x24 (and 60x20 for dialogs), and a short manual checklist for the human.
+
+## A21. Snapshot tests (how the small model can "see" the screen)
+
+In `src/tui/testing.rs` build two helpers on `ratatui::backend::TestBackend`:
+- `render_to_string(app: &mut App, width: u16, height: u16) -> String`: draw one frame into a `TestBackend` and return the buffer as text, one line per row, trailing spaces trimmed. Colors are ignored.
+- `assert_snapshot(name: &str, actual: &str)`: compares with `tests/snapshots/<name>.txt`. If the file is missing or the environment variable `UPDATE_SNAPSHOTS=1` is set, it writes the file instead and the test passes. A changed snapshot must be shown to the human in the stage report; never update snapshots silently.
+- `replay(app: &mut App, keys: &str) -> Vec<Effect>`: feed a space-separated key script such as `"ctrl+p m o d enter"` (`ctrl+x`, `alt+x`, `shift+tab`, `enter`, `esc`, `up`, `down`, `tab`, `backspace`, single characters; `paste:<text>` pastes) through `update` and return all effects produced.
+A snapshot is a text file: the small model can print it and read the layout.
+
+## A22. PREFIX for this part
+
+> Read AGENTS.md (including the A13 to A22 sections that exist) and PROGRESS.md first. Do ONLY the stage below. Follow the IRON RULES and the TUI rules A19 to A21. If a file I mention exists, read it and extend it; do not rewrite it. Show me every changed snapshot.

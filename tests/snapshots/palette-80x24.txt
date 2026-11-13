@@ -1,0 +1,24 @@
+
+
+    ┌ Commands · 1/22 ─────────────────────────────────────────────────────┐
+    │ ›                                                                    │
+    │  Session                                                             │
+    │   /connect                                                           │
+    │   /new                                                               │
+    │   /sessions                                                          │
+    │   /rename                                                            │
+    │   /tree                                                              │
+    │   /fork                                                              │
+    │   /compact                                                           │
+    │   /copy                                                              │
+    │   /export                                                            │
+    │  Model                                                               │
+    │   /mode                                                    shift+tab │
+    │   /models                                                     ctrl+l │
+    │   /model                                                             │
+    │  View                                                                │
+    │                                                                      │
+    │ ↑↓ select · enter run · esc close                                    │
+    └──────────────────────────────────────────────────────────────────────┘
+
+ ~/code/my-project  main*    openrouter/deepseek/deepseek-v4-flash  ctx 0%  ask

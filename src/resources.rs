@@ -41,38 +41,38 @@ pub struct Resources {
     pub skills: Vec<Skill>,
 }
 
-/// Load resources for `cwd`, using the real pirs home folder.
+/// Load resources for `cwd`, using the real arqus home folder.
 pub fn load(cwd: &Path) -> Resources {
-    load_in(&crate::home::pirs_home(), cwd)
+    load_in(&crate::home::arqus_home(), cwd)
 }
 
 /// Load resources and scan extra skill folders from settings.
 pub fn load_with(cwd: &Path, extra_skill_folders: &[String]) -> Resources {
-    load_in_with(&crate::home::pirs_home(), cwd, extra_skill_folders)
+    load_in_with(&crate::home::arqus_home(), cwd, extra_skill_folders)
 }
 
-/// Same as `load`, but with an explicit pirs home folder. Tests use this.
+/// Same as `load`, but with an explicit arqus home folder. Tests use this.
 pub fn load_in(home: &Path, cwd: &Path) -> Resources {
     load_in_with(home, cwd, &[])
 }
 
-/// Same as `load_in`, plus extra skill folders. `home` is the pirs home, so
+/// Same as `load_in`, plus extra skill folders. `home` is the arqus home, so
 /// the global files live directly inside it.
 pub fn load_in_with(home: &Path, cwd: &Path, extra_skill_folders: &[String]) -> Resources {
     Resources {
         home: home.to_path_buf(),
         cwd: cwd.to_path_buf(),
         agents: load_agents(home, cwd),
-        system: read_first(&[cwd.join(".pirs").join("SYSTEM.md"), home.join("SYSTEM.md")]),
+        system: read_first(&[cwd.join(".arqus").join("SYSTEM.md"), home.join("SYSTEM.md")]),
         append: read_first(&[
-            cwd.join(".pirs").join("APPEND_SYSTEM.md"),
+            cwd.join(".arqus").join("APPEND_SYSTEM.md"),
             home.join("APPEND_SYSTEM.md"),
         ]),
         skills: load_skills(home, cwd, extra_skill_folders),
     }
 }
 
-/// Global `<PIRS_HOME>/AGENTS.md`, then each folder from the root down to cwd.
+/// Global `<ARQUS_HOME>/AGENTS.md`, then each folder from the root down to cwd.
 /// In each folder `AGENTS.md` wins; `CLAUDE.md` is the fallback.
 fn load_agents(home: &Path, cwd: &Path) -> Vec<AgentFile> {
     let mut out = Vec::new();
@@ -117,7 +117,7 @@ fn read_first(paths: &[PathBuf]) -> Option<String> {
 /// A later skill wins on a name clash.
 fn load_skills(home: &Path, cwd: &Path, extra: &[String]) -> Vec<Skill> {
     let mut by_name: BTreeMap<String, Skill> = BTreeMap::new();
-    let mut roots = vec![home.join("skills"), cwd.join(".pirs").join("skills")];
+    let mut roots = vec![home.join("skills"), cwd.join(".arqus").join("skills")];
     roots.extend(extra.iter().map(|raw| resolve_folder(raw, home, cwd)));
     for root in roots {
         for skill in skills_in(&root) {
@@ -267,7 +267,7 @@ fn valid_name(name: &str) -> bool {
 fn read_prompt(res: &Resources, name: &str) -> Option<String> {
     let file = format!("{name}.md");
     read_first(&[
-        res.cwd.join(".pirs").join("prompts").join(&file),
+        res.cwd.join(".arqus").join("prompts").join(&file),
         res.home.join("prompts").join(&file),
     ])
 }

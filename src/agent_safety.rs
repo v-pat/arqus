@@ -13,7 +13,9 @@ use super::{AgentConfig, AgentEvent};
 
 pub const RISKY_MARKER: &str = "RISKY";
 pub const DENIED: &str = "The user denied this tool call.";
-pub const APPROVAL_REQUIRED: &str = "Approval required. Run pirs with --yolo to allow this.";
+pub const APPROVAL_REQUIRED: &str = "Approval required. Run arqus with --yolo to allow this.";
+pub const PLAN_REFUSAL: &str = "Plan mode: changes are disabled. Describe the plan instead.";
+pub const PLAN_NOTE: &str = "Plan mode: changes are disabled. Describe the plan instead.";
 
 /// Check one call. `Err` is the tool result to send back to the model.
 ///
@@ -26,6 +28,11 @@ pub async fn approve(
     events: &Sender<AgentEvent>,
     approval_rx: &mut Receiver<Decision>,
 ) -> Result<(), ToolOutput> {
+    // Plan mode: reads still work, every change is refused with one clear line.
+    if cfg.plan && name != "read" {
+        return Err(ToolOutput::error(PLAN_REFUSAL));
+    }
+
     if let Some(path) = args.get("path").and_then(Value::as_str) {
         let op = match name {
             "read" => Some(PathOp::Read),
@@ -47,7 +54,7 @@ pub async fn approve(
     if risky.is_some() && cfg.approver == Approver::Auto && !cfg.allow_risky {
         let reason = risky.clone().unwrap_or_default();
         return Err(ToolOutput::error(format!(
-            "refused risky command: {reason} (start pirs with --allow-risky to allow it)"
+            "refused risky command: {reason} (start arqus with --allow-risky to allow it)"
         )));
     }
 
@@ -60,7 +67,7 @@ pub async fn approve(
         Approver::Auto => Ok(()),
         Approver::DenyAll => Err(ToolOutput::error(APPROVAL_REQUIRED)),
         Approver::Interactive => {
-            if cfg.approvals.is_always(name) {
+            if cfg.approvals.is_always(name) && (risky.is_none() || cfg.allow_risky) {
                 return Ok(());
             }
             let preview = preview(name, args, risky.as_deref());
@@ -138,5 +145,60 @@ fn push_head(lines: &mut Vec<String>, text: &str, max: usize) {
     let total = text.lines().count();
     if total > max {
         lines.push(format!("... {} more lines", total - max));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cost::Limits;
+    use crate::safety::{Approvals, Approver, Guard};
+    use serde_json::json;
+    use tokio::sync::mpsc;
+
+    #[tokio::test]
+    async fn allow_always_does_not_skip_risky_commands() {
+        let (events_tx, mut events_rx) = mpsc::channel(10);
+        let (approval_tx, mut approval_rx) = mpsc::channel(1);
+
+        let approvals = Approvals::default();
+        approvals.remember("bash");
+
+        let cfg = AgentConfig {
+            cwd: std::env::temp_dir(),
+            system_prompt: String::new(),
+            context_window: 128000,
+            compaction: Default::default(),
+            limits: Limits::default(),
+            approver: Approver::Interactive,
+            allow_risky: false,
+            plan: false,
+            approvals,
+            guard: Guard::default(),
+        };
+
+        // 1. Safe command is allowed automatically
+        let safe_args = json!({"command": "echo hello"});
+        let res = approve("bash", &safe_args, &cfg, &events_tx, &mut approval_rx).await;
+        assert!(res.is_ok());
+
+        // 2. Risky command must still ask for approval despite allow_always
+        let risky_args = json!({"command": "sudo rm -rf /"});
+        tokio::spawn(async move {
+            approval_tx.send(Decision::Deny).await.unwrap();
+        });
+        let res = approve("bash", &risky_args, &cfg, &events_tx, &mut approval_rx).await;
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert_eq!(err.text, DENIED);
+
+        let ev = events_rx.recv().await.unwrap();
+        match ev {
+            AgentEvent::ApprovalRequest { tool, preview } => {
+                assert_eq!(tool, "bash");
+                assert!(preview.contains(RISKY_MARKER));
+            }
+            other => panic!("expected ApprovalRequest, got {other:?}"),
+        }
     }
 }

@@ -18,13 +18,13 @@ pub fn approver(yolo: bool, settings: &Settings, interactive: bool) -> Approver 
     }
 }
 
-/// Path rules: project folder, settings allow_paths, pirs home, user home.
+/// Path rules: project folder, settings allow_paths, arqus home, user home.
 pub fn guard(settings: &Settings, cwd: &Path) -> Guard {
     let user_home = dirs::home_dir();
     Guard {
         cwd: cwd.to_path_buf(),
         allow_paths: safety::expand_allow_paths(&settings.allow_paths, cwd, user_home.as_deref()),
-        pirs_home: home::pirs_home(),
+        arqus_home: home::arqus_home(),
         user_home,
     }
 }
