@@ -43,7 +43,7 @@ done
         )
         .await;
 
-    assert_eq!(output.is_error, true);
+    assert!(output.is_error);
     assert!(output.text.contains("closed connection unexpectedly"));
 
     manager.shutdown().await;
@@ -85,7 +85,7 @@ done
         )
         .await;
 
-    assert_eq!(output.is_error, true);
+    assert!(output.is_error);
     assert!(output.text.contains("timeout waiting for MCP server"));
 
     manager.shutdown().await;
@@ -132,7 +132,7 @@ done
         )
         .await;
 
-    assert_eq!(output.is_error, false);
+    assert!(!output.is_error);
     assert!(output.text.len() <= 50_500);
     assert!(output
         .text

@@ -113,7 +113,7 @@ async fn serena_tool_execution_success() {
         )
         .await;
 
-    assert_eq!(output.is_error, false);
+    assert!(!output.is_error);
     assert!(output.text.contains("SymbolTree: fn main()"));
 
     manager.shutdown().await;
@@ -278,7 +278,7 @@ async fn full_agent_turn_with_serena_mcp() {
     } = &entries[2].kind
     {
         assert_eq!(tool_name, "mcp__serena__get_symbols");
-        assert_eq!(*is_error, false);
+        assert!(!(*is_error));
         assert!(text.contains("SymbolTree: fn main()"));
     } else {
         panic!("entry 2 should be ToolResult for serena");

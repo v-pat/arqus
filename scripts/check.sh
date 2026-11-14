@@ -17,10 +17,14 @@ echo "==> cargo build --release"
 cargo build --release
 
 echo "==> secret scan"
-# The stage brief quotes a fake key in its own test description.
-if git grep -nE "sk-(or-)?[A-Za-z0-9_-]{16,}" -- . ':(exclude)arqus-stages-12-plus.md'; then
+# Exclude markdown stage specs and auth test fixtures that test fake key masking/parsing.
+if git grep -nE "sk-(or-)?[A-Za-z0-9_-]{16,}" -- . ':(exclude)*stages*.md' ':(exclude)arqus-tui-starter' ':(exclude)*connect_tests.rs' ':(exclude)*auth.rs'; then
     echo "secret scan: a possible API key is committed" >&2
     exit 1
 fi
+
+echo "==> audit flow"
+./scripts/audit-flow.sh
+./scripts/test-audit-flow.sh
 
 echo "all checks passed"

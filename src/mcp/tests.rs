@@ -171,7 +171,7 @@ done
         .call_tool("echo", &json!({ "msg": "hello" }), 5)
         .await
         .expect("call_tool");
-    assert_eq!(call_res.is_error, false);
+    assert!(!call_res.is_error);
     assert_eq!(call_res.content.len(), 1);
     match &call_res.content[0] {
         McpContent::Text { text } => assert_eq!(text, "echoed successfully"),

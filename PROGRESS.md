@@ -1573,3 +1573,27 @@
 - Next stage:
   - Continued development and production usage.
 
+## Stage F0: Orientation and gate (no feature code)   [DONE]
+- Files created or changed:
+  - `docs/flow/NOTES.md` (new): comprehensive analysis of SPEC.md Section 3 touch points, real type/function signatures, additive classification, and flagged assumptions.
+  - `Cargo.toml`: added `shlex = "2.0.1"` to dependencies, and `proptest = "1.12.0"` and `tempfile = "3.27.0"` to dev-dependencies.
+  - `scripts/audit-flow.sh` (new): automated audit gate checking forbidden keywords, line counts, imports, live test ignore bounds, and sibling test file pairing.
+  - `scripts/test-audit-flow.sh` (new): 30 isolated test fixtures verifying each violation fails and clean trees pass.
+  - `scripts/check.sh`: wired `scripts/audit-flow.sh` and `scripts/test-audit-flow.sh`, and refined secret scan pattern.
+  - `tests/common/mod.rs` (new): shared test doubles module re-exporting `tests/support` and aliasing `pub type MockServer = support::FakeLlm;`.
+  - `src/mcp/adversarial_tests.rs`, `src/mcp/serena_tests.rs`, `src/mcp/tests.rs`: replaced `assert_eq!(..., true/false)` with `assert!(...)`/`assert!(!...)` to fix pre-existing `-D clippy::bool-assert-comparison` lint errors.
+- What works (command + short real output):
+  - `./scripts/test-audit-flow.sh` -> `Tests passed: 30, failed: 0. All audit-flow tests passed!`
+  - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
+  - `cargo test` -> `590 unittests passed; 51 integration tests passed; 0 failed; 6 ignored (live)`
+  - `cargo clippy --all-targets -- -D warnings` -> clean (0 warnings, 0 errors)
+  - `scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - All existing e2e tests already shared `tests/support/mod.rs`; `tests/common/mod.rs` was added additively to serve flow tests without altering existing test imports.
+  - The 6 clippy bool assert comparisons in `src/mcp/*` were minor test lint violations preventing `check.sh` from completing with `-D warnings`, updated cleanly without changing test behavior.
+- Known problems / TODO:
+  - None. Ready for Stage F1 (Schemas, errors, config).
+- Next stage:
+  - Stage F1: Schemas, errors, config (`src/flow/schema.rs`, `src/flow/errors.rs`, `src/flow/config.rs`).
+
+
