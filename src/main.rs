@@ -11,6 +11,7 @@ mod context;
 mod cost;
 mod debug;
 mod home;
+mod mcp;
 mod models;
 mod print;
 mod resources;
@@ -106,6 +107,7 @@ async fn interactive_mode(cli: &Cli) -> anyhow::Result<()> {
         plan: false,
         approvals: Approvals::default(),
         guard: safety_setup::guard(&settings, &cwd),
+        mcp: Some(mcp::McpManager::for_cwd(&cwd)),
     };
     let model_name = if model.model.is_empty() {
         "(no model)".to_string()

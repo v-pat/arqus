@@ -127,6 +127,25 @@ pub fn summary_for(name: &str, args: &Value) -> String {
             let first = command.lines().next().unwrap_or("").trim();
             format!("bash {}", truncate_width(first, 50))
         }
+        other if other.starts_with(crate::mcp::MCP_PREFIX) => {
+            if let Some((server, tool)) = crate::mcp::parse_tool_name(other) {
+                if let Some(path) = args.get("path").and_then(|value| value.as_str()) {
+                    format!("mcp:{server}/{tool} {path}")
+                } else if let Some(query) = args
+                    .get("query")
+                    .or_else(|| args.get("symbol_name"))
+                    .and_then(|value| value.as_str())
+                {
+                    format!("mcp:{server}/{tool} \"{}\"", truncate_width(query, 30))
+                } else if let Some(cmd) = args.get("command").and_then(|value| value.as_str()) {
+                    format!("mcp:{server}/{tool} {}", truncate_width(cmd, 30))
+                } else {
+                    format!("mcp:{server}/{tool}")
+                }
+            } else {
+                other.to_string()
+            }
+        }
         other => other.to_string(),
     }
 }

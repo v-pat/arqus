@@ -30,7 +30,18 @@ pub async fn approve(
 ) -> Result<(), ToolOutput> {
     // Plan mode: reads still work, every change is refused with one clear line.
     if cfg.plan && name != "read" {
-        return Err(ToolOutput::error(PLAN_REFUSAL));
+        let is_mcp_read = if let Some((_, tool_name)) = crate::mcp::parse_tool_name(name) {
+            let prefix = tool_name.split('_').next().unwrap_or("");
+            matches!(
+                prefix,
+                "get" | "list" | "find" | "search" | "read" | "inspect" | "check"
+            )
+        } else {
+            false
+        };
+        if !is_mcp_read {
+            return Err(ToolOutput::error(PLAN_REFUSAL));
+        }
     }
 
     if let Some(path) = args.get("path").and_then(Value::as_str) {
@@ -133,6 +144,21 @@ pub fn preview(tool: &str, args: &Value, risky: Option<&str>) -> String {
                     .to_string(),
             );
         }
+        other if other.starts_with(crate::mcp::MCP_PREFIX) => {
+            if let Some((server, tool_name)) = crate::mcp::parse_tool_name(other) {
+                lines.push(format!("mcp server: {server}"));
+                lines.push(format!("mcp tool:   {tool_name}"));
+                lines.push(String::new());
+                lines.push("arguments:".to_string());
+                if let Ok(pretty) = serde_json::to_string_pretty(args) {
+                    push_head(&mut lines, &pretty, 20);
+                } else {
+                    lines.push(args.to_string());
+                }
+            } else {
+                lines.push(format!("tool: {other}"));
+            }
+        }
         other => lines.push(format!("tool: {other}")),
     }
     lines.join("\n")
@@ -175,6 +201,7 @@ mod tests {
             plan: false,
             approvals,
             guard: Guard::default(),
+            mcp: None,
         };
 
         // 1. Safe command is allowed automatically

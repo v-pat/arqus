@@ -1,7 +1,8 @@
 use super::*;
+use crate::ai::StreamEvent;
 use crate::safety::{Approvals, Approver, Decision, Guard};
 use crate::session::new_id;
-use crate::types::Entry;
+use crate::types::{Block, Entry};
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 
@@ -59,6 +60,7 @@ fn config(cwd: &std::path::Path) -> AgentConfig {
             arqus_home: cwd.join(".arqus-home"),
             user_home: Some(cwd.join(".home")),
         },
+        mcp: None,
     }
 }
 

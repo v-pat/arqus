@@ -1509,3 +1509,37 @@
     a truecolor terminal, glyph widths, scrolling, Option-as-Meta).
 - Next stage:
   - The Part 4 gate and the v0.2.0 release checks.
+
+## Stage M: Model Context Protocol (MCP) Support & Serena Integration   [DONE]
+- Files created or changed:
+  - `src/mcp/types.rs`: JSON-RPC 2.0 wire format (Request, Response, Notification, Error), MCP protocol types (`McpInitializeParams`, `McpInitializeResult`, `McpTool`, `McpCallResult`, `McpServerConfig`).
+  - `src/mcp/transport.rs`: Stdio transport over async child process with process group isolation (`process_group(0)`) and `kill_on_drop(true)`.
+  - `src/mcp/client.rs`: Async MCP client actor handling handshake (`initialize`, `notifications/initialized`), `tools/list`, and `tools/call` with timeout handling.
+  - `src/mcp/schema.rs`: Token-efficient schema pruning (stripping `$schema`, `title`, excess metadata), description compacting, and namespace formatting (`mcp__{server}__{tool}`).
+  - `src/mcp/config.rs`: Multi-tier configuration loader merging `~/.arqus/mcp.json` and `<cwd>/.arqus/mcp.json` with environment variable expansion (`${VAR}`).
+  - `src/mcp/manager.rs`: `McpManager` coordinating multi-server lifecycles, lazy child process spawning, output truncation (50KB cap), and tool dispatching.
+  - `src/mcp/mod.rs`: Clean module interface and exports.
+  - `src/mcp/tests.rs`: Unit tests for JSON-RPC, schema pruning, config loading, and mock server handshake.
+  - `src/mcp/serena_tests.rs`: Functional tests for Serena MCP (symbol AST discovery, semantic symbol editing, plan mode safety, approval preview formatting, multi-turn agent execution).
+  - `src/mcp/adversarial_tests.rs`: Stress and failure tests (server crash mid-call, hanging server timeout, output payload bomb truncation).
+  - `src/agent.rs`, `src/agent_util.rs`: Integrated `McpManager` into `AgentConfig`, tool gathering, and tool execution.
+  - `src/agent_safety.rs`: MCP tool approval preview rendering and Plan mode read-only permissions for inspection tools.
+  - `src/compaction.rs`, `src/compaction_tests.rs`: Added support for tracking files inspected or modified by MCP Serena operations across context compactions.
+  - `src/main.rs`, `src/print.rs`: Wired `McpManager::for_cwd` on startup.
+  - `src/tui/block.rs`, `src/tui/block_tests.rs`: Formatted MCP tools cleanly as `mcp:server/tool args` in summary blocks.
+  - `src/tui/widgets/tool_card.rs`: Rendered `● mcp:server/tool` in tool cards instead of internal identifiers.
+  - `src/tui/view.rs`, `src/tui/approval_tests.rs`: Formatted approval modal header as `Run MCP server / tool?` with full action detail.
+  - `src/tui/commands.rs`, `src/tui/command_registry.rs`: Added `/mcp` slash command to inspect configured MCP servers in the TUI.
+  - `tests/snapshots/`: Updated `help` and `palette` snapshots to reflect the new `/mcp` command.
+  - `README.md`: Documented MCP support, Serena integration, efficiency optimizations, and `/mcp` command.
+- What works (command + short real output):
+  - `cargo test mcp:: --bin arqus` -> `test result: ok. 15 passed; 0 failed; finished in 1.02s`
+  - `cargo test --bin arqus` -> `test result: ok. 581 passed; 0 failed; finished in 1.10s`
+  - `cargo clippy --bin arqus` -> clean with 0 warnings
+  - `cargo fmt --check` -> clean
+- Assumptions:
+  - Tool names are namespaced with `mcp__{server}__{tool}` to avoid collisions with built-in tools (`read`, `write`, `edit`, `bash`).
+  - Read-only inspection tools from Serena (`get_symbols`, `find_references`, etc.) are allowed in Plan mode, while mutating tools (`edit_symbol`, `rename_symbol`) are refused with `PLAN_REFUSAL`.
+  - Process groups ensure all child processes spawned by language server backends (like Serena's rust-analyzer or python subprocesses) are killed cleanly without orphan processes.
+- Known problems / TODO:
+  - Remote HTTP/SSE MCP servers can be added as a subsequent transport layer.

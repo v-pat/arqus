@@ -108,6 +108,14 @@ pub fn registry() -> Vec<Command> {
             Export,
         ),
         command(
+            "mcp",
+            &[],
+            "List configured MCP servers",
+            "Session",
+            None,
+            Mcp,
+        ),
+        command(
             "mode",
             &[],
             "ask · auto · plan",

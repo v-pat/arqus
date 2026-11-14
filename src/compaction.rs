@@ -158,14 +158,22 @@ pub fn extract_file_ops(entries: &[Entry]) -> (Vec<String>, Vec<String>) {
                     let Some(path) = args.get("path").and_then(|v| v.as_str()) else {
                         continue;
                     };
-                    match name.as_str() {
-                        "read" => {
-                            read.insert(path.to_string());
-                        }
-                        "write" | "edit" => {
-                            modified.insert(path.to_string());
-                        }
-                        _ => {}
+                    let is_mod = matches!(name.as_str(), "write" | "edit")
+                        || (name.starts_with(crate::mcp::MCP_PREFIX)
+                            && (name.contains("edit")
+                                || name.contains("write")
+                                || name.contains("modify")
+                                || name.contains("rename")));
+                    let is_read = name == "read"
+                        || (name.starts_with(crate::mcp::MCP_PREFIX)
+                            && (name.contains("read")
+                                || name.contains("get")
+                                || name.contains("find")));
+
+                    if is_mod {
+                        modified.insert(path.to_string());
+                    } else if is_read {
+                        read.insert(path.to_string());
                     }
                 }
             }

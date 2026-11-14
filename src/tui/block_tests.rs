@@ -53,6 +53,21 @@ fn bash_summary_keeps_the_first_line_and_truncates() {
 }
 
 #[test]
+fn mcp_summary_shows_server_tool_and_args() {
+    assert_eq!(
+        summary_for("mcp__serena__get_symbols", &json!({"path": "src/main.rs"})),
+        "mcp:serena/get_symbols src/main.rs"
+    );
+    assert_eq!(
+        summary_for(
+            "mcp__serena__find_references",
+            &json!({"symbol_name": "AgentConfig"})
+        ),
+        "mcp:serena/find_references \"AgentConfig\""
+    );
+}
+
+#[test]
 fn truncate_width_is_display_width_aware() {
     assert_eq!(truncate_width("abc", 10), "abc");
     assert_eq!(truncate_width("abcdef", 4), "abc…");

@@ -112,6 +112,38 @@ pub fn drain_steering(
 
 /// Compact when the context no longer fits. Never fails the turn on a
 /// summarizer error: the next request reports the real problem.
+pub async fn drain_stream(
+    rx: &mut tokio::sync::mpsc::Receiver<crate::ai::StreamEvent>,
+    events: &tokio::sync::mpsc::Sender<super::AgentEvent>,
+    text: &mut String,
+    thinking: &mut String,
+    done: &mut Option<crate::types::Message>,
+    stream_error: &mut Option<String>,
+    overflow: &mut bool,
+) {
+    while let Some(event) = rx.recv().await {
+        match event {
+            crate::ai::StreamEvent::TextDelta(delta) => {
+                text.push_str(&delta);
+                let _ = events.send(super::AgentEvent::TextDelta(delta)).await;
+            }
+            crate::ai::StreamEvent::ThinkingDelta(delta) => {
+                thinking.push_str(&delta);
+                let _ = events.send(super::AgentEvent::ThinkingDelta(delta)).await;
+            }
+            crate::ai::StreamEvent::ToolCall { .. } => {}
+            crate::ai::StreamEvent::Done(message) => *done = Some(message),
+            crate::ai::StreamEvent::Error(err_text) => {
+                *overflow = *overflow || is_context_overflow(&err_text);
+                stream_error.get_or_insert(err_text);
+            }
+            crate::ai::StreamEvent::Notice(notice_text) => {
+                let _ = events.send(super::AgentEvent::Notice(notice_text)).await;
+            }
+        }
+    }
+}
+
 pub async fn maybe_compact(
     session: &mut crate::session::Session,
     llm: &crate::ai::Llm,
@@ -135,6 +167,54 @@ pub async fn maybe_compact(
             .await;
     }
     Ok(())
+}
+
+/// Gather all tool definitions (builtins + discovered MCP tools).
+pub async fn all_tool_defs(cfg: &super::AgentConfig) -> Vec<crate::ai::ToolDef> {
+    let mut defs = crate::tools::tool_defs();
+    if let Some(mcp) = &cfg.mcp {
+        defs.extend(mcp.current_tool_defs().await);
+    }
+    defs
+}
+
+/// Extract tool calls from assistant blocks.
+pub fn extract_tool_calls(blocks: &[Block]) -> Vec<(String, String, Value)> {
+    blocks
+        .iter()
+        .filter_map(|block| match block {
+            Block::ToolCall { id, name, args } => Some((id.clone(), name.clone(), args.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Check if blocks contain any text or tool calls (thinking only does not count).
+pub fn has_content(blocks: &[Block]) -> bool {
+    blocks.iter().any(|block| match block {
+        Block::Text { text } => !text.is_empty(),
+        Block::ToolCall { .. } => true,
+        Block::Thinking { .. } => false,
+    })
+}
+
+/// Execute a tool call, routing to MCP when prefixed or built-in otherwise.
+pub async fn execute_tool(
+    name: &str,
+    args: &Value,
+    cfg: &super::AgentConfig,
+) -> crate::tools::ToolOutput {
+    if name.starts_with(crate::mcp::MCP_PREFIX) {
+        if let Some(mcp) = &cfg.mcp {
+            mcp.execute(name, args).await
+        } else {
+            crate::tools::ToolOutput::error(format!(
+                "MCP tool `{name}` called but no MCP manager is active"
+            ))
+        }
+    } else {
+        crate::tools::execute(name, args, &cfg.cwd).await
+    }
 }
 
 #[cfg(test)]

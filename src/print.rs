@@ -51,6 +51,7 @@ pub async fn print_mode(cli: &Cli, prompt: String) -> anyhow::Result<()> {
         plan: false,
         approvals: Approvals::default(),
         guard: safety_setup::guard(&settings, &cwd),
+        mcp: Some(crate::mcp::McpManager::for_cwd(&cwd)),
     };
     let llm = Llm::from_config(model.clone());
 

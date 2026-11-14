@@ -244,20 +244,28 @@ fn draw_approval(
             Line::from(format!(" {text}")).style(style)
         })
         .collect();
+    let (tool_label, title) = match approval.tool.as_str() {
+        "bash" => ("bash".to_string(), "Run command?".to_string()),
+        "write" => ("write".to_string(), "Write file?".to_string()),
+        "edit" => ("edit".to_string(), "Edit file?".to_string()),
+        other => {
+            if let Some((server, tool_name)) = crate::mcp::parse_tool_name(other) {
+                (
+                    format!("mcp:{server}/{tool_name}"),
+                    format!("Run MCP {server} / {tool_name}?"),
+                )
+            } else {
+                (other.to_string(), format!("Approve {other}?"))
+            }
+        }
+    };
     items.push(Line::from(""));
     items.push(
         Line::from(format!(
-            " y allow once · a always allow {} · n deny · esc stop run ",
-            approval.tool
+            " y allow once · a always allow {tool_label} · n deny · esc stop run ",
         ))
         .style(Style::default().fg(theme.dim)),
     );
-    let title = match approval.tool.as_str() {
-        "bash" => "Run command?".to_string(),
-        "write" => "Write file?".to_string(),
-        "edit" => "Edit file?".to_string(),
-        other => format!("Approve {other}?"),
-    };
     let modal = Paragraph::new(Text::from(items)).block(
         Block::bordered()
             .title(format!(" {title} "))

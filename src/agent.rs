@@ -9,14 +9,13 @@ use anyhow::Result;
 use serde_json::Value;
 use tokio::sync::mpsc::{Sender, UnboundedReceiver};
 
-use crate::ai::{Llm, LlmRequest, StreamEvent};
+use crate::ai::{Llm, LlmRequest};
 use crate::compaction::{compact, CompactionSettings};
 use crate::context::build_context;
 use crate::cost::{self, Limits};
 use crate::safety::{Approvals, Approver, Decision, Guard};
 use crate::session::Session;
-use crate::tools;
-use crate::types::{Block, EntryKind, Message, StopReason};
+use crate::types::{EntryKind, Message, StopReason};
 
 /// One event from a turn. The UI decides how to show it.
 #[derive(Debug, Clone, PartialEq)]
@@ -62,6 +61,7 @@ pub struct AgentConfig {
     pub plan: bool,
     pub approvals: Approvals,
     pub guard: Guard,
+    pub mcp: Option<crate::mcp::McpManager>,
 }
 
 impl AgentConfig {
@@ -80,12 +80,13 @@ mod runtime;
 pub use runtime::Runtime;
 
 #[path = "agent_safety.rs"]
-mod safety_flow;
+pub mod safety_flow;
 #[path = "agent_util.rs"]
 mod util;
 pub use safety_flow::PLAN_NOTE;
 #[cfg(test)]
-pub use safety_flow::{preview as approval_preview, PLAN_REFUSAL};
+#[allow(unused_imports)]
+pub use safety_flow::{approve, preview as approval_preview, PLAN_REFUSAL};
 #[cfg(test)]
 use util::drain_steering;
 use util::{accumulated, is_context_overflow, parts, Runaway};
@@ -104,6 +105,12 @@ pub async fn run_prompt(
         message: Message::User { text: user_text },
     })?;
 
+    if let Some(mcp) = &cfg.mcp {
+        if mcp.has_servers() {
+            let _ = mcp.discover_tools().await;
+        }
+    }
+
     let mut overflow_retried = false;
     let run_start = cost::session_totals(&session.entries);
     let mut runaway = Runaway::default();
@@ -121,10 +128,11 @@ pub async fn run_prompt(
         }
 
         let messages = build_context(&session.entries, session.leaf_id.as_deref());
+        let tools = util::all_tool_defs(cfg).await;
         let request = LlmRequest {
             system: cfg.turn_system_prompt(),
             messages,
-            tools: tools::tool_defs(),
+            tools,
             max_tokens: Some(cfg.limits.max_output_tokens),
         };
 
@@ -140,28 +148,16 @@ pub async fn run_prompt(
         let mut stream_error: Option<String> = None;
         let mut overflow = false;
 
-        while let Some(event) = rx.recv().await {
-            match event {
-                StreamEvent::TextDelta(delta) => {
-                    text.push_str(&delta);
-                    let _ = events.send(AgentEvent::TextDelta(delta)).await;
-                }
-                StreamEvent::ThinkingDelta(delta) => {
-                    thinking.push_str(&delta);
-                    let _ = events.send(AgentEvent::ThinkingDelta(delta)).await;
-                }
-                // The Done message already carries the complete blocks.
-                StreamEvent::ToolCall { .. } => {}
-                StreamEvent::Done(message) => done = Some(message),
-                StreamEvent::Error(text) => {
-                    overflow = overflow || is_context_overflow(&text);
-                    stream_error.get_or_insert(text);
-                }
-                StreamEvent::Notice(text) => {
-                    let _ = events.send(AgentEvent::Notice(text)).await;
-                }
-            };
-        }
+        util::drain_stream(
+            &mut rx,
+            &events,
+            &mut text,
+            &mut thinking,
+            &mut done,
+            &mut stream_error,
+            &mut overflow,
+        )
+        .await;
 
         if let Err(err) = task.await? {
             overflow = overflow
@@ -218,21 +214,8 @@ pub async fn run_prompt(
         };
         session.append(EntryKind::Message { message })?;
 
-        let calls: Vec<(String, String, Value)> = blocks
-            .iter()
-            .filter_map(|block| match block {
-                Block::ToolCall { id, name, args } => {
-                    Some((id.clone(), name.clone(), args.clone()))
-                }
-                _ => None,
-            })
-            .collect();
-
-        let has_content = blocks.iter().any(|block| match block {
-            Block::Text { text } => !text.is_empty(),
-            Block::ToolCall { .. } => true,
-            Block::Thinking { .. } => false,
-        });
+        let calls = util::extract_tool_calls(&blocks);
+        let has_content = util::has_content(&blocks);
 
         if runaway.empty_twice(has_content) {
             let _ = events
@@ -278,7 +261,7 @@ pub async fn run_prompt(
             crate::debug::log("tool", serde_json::json!({"name": name, "args": args}));
             let output =
                 match safety_flow::approve(&name, &args, cfg, &events, &mut approval_rx).await {
-                    Ok(()) => tools::execute(&name, &args, &cfg.cwd).await,
+                    Ok(()) => util::execute_tool(&name, &args, cfg).await,
                     Err(refusal) => refusal,
                 };
             session.append(EntryKind::Message {
