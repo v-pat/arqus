@@ -99,6 +99,15 @@ pub struct Cli {
     /// Execution mode: ask (default), auto (same as --yolo), or plan
     #[arg(long = "mode", value_name = "MODE")]
     pub mode: Option<String>,
+    /// Subcommand
+    #[command(subcommand)]
+    pub command: Option<Command>,
+}
+
+#[derive(Debug, clap::Subcommand, PartialEq, Clone)]
+pub enum Command {
+    /// Collaborative multi-model planning and execution
+    Flow(crate::flow::cli::FlowArgs),
 }
 
 /// Limits: CLI flag beats environment, which beats settings, which beats

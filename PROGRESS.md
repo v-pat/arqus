@@ -1596,4 +1596,30 @@
 - Next stage:
   - Stage F1: Schemas, errors, config (`src/flow/schema.rs`, `src/flow/errors.rs`, `src/flow/config.rs`).
 
+## Stage F1: Schemas, errors, config   [DONE]
+- Files created or changed:
+  - `src/flow/mod.rs`: flow module root declaring `cli`, `config`, `errors`, `schema`.
+  - `src/flow/errors.rs`, `src/flow/errors_tests.rs`: typed `FlowError` enum with hand-written `Display` (no `thiserror`) and unit tests.
+  - `src/flow/schema/types.rs`, `src/flow/schema/mod.rs`, `src/flow/schema/tests.rs`: spec §5 data models (`Category`, `Assignee`, `FileRef`, `TaskContract`, `Plan`, `PlannerReply`, `FailureKind`, `FailureRecord`, `RedesignDecision`, `Edit`, `TaskStatus`, `RunStatus`, `TaskState`, `RunState`, `Issue`, `IssueCode`) and pure validation functions (`validate_task_id`, `validate_file_ref`, `validate_shape`).
+  - `src/flow/config/types.rs`, `src/flow/config/defaults.rs`, `src/flow/config/mod.rs`, `src/flow/config/tests.rs`: settings deserialization with `deny_unknown_fields`, precedence resolution, role API key lookup, worker validation, and CLI overrides.
+  - `src/flow/cli.rs`, `src/flow/cli_tests.rs`: clap CLI skeleton for `flow` (`run`, `resume`, `report`, `models-check`) and execution entrypoint.
+  - `src/debug.rs`: additive multi-key redactor (`register_redacted_key`, `redact_with_keys`).
+  - `src/cli.rs`: added optional `command: Option<Command>` with `Command::Flow` subcommand.
+  - `src/main.rs`: wired `mod flow;` and subcommand dispatch.
+- What works (command + short real output):
+  - `cargo test --bin arqus flow` -> `test result: ok. 26 passed; 0 failed; finished in 0.01s`
+  - `cargo run -- flow --help` -> prints `arqus flow <COMMAND>` help with all subcommands (`run`, `resume`, `report`, `models-check`)
+  - `cargo run -- flow run --help` -> prints `arqus flow run [OPTIONS] <OBJECTIVE>`
+  - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
+  - `./scripts/test-audit-flow.sh` -> `Tests passed: 30, failed: 0. All audit-flow tests passed!`
+  - `./scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - `RedesignDecision::Revise` uses `Box<TaskContract>` to avoid clippy's `large_enum_variant` warning while preserving identical JSON serialization/deserialization.
+  - `schema` and `config` are organized into submodules (`src/flow/schema/` and `src/flow/config/`) to ensure all source files remain strictly under the 300-line limit per rule.
+- Known problems / TODO:
+  - None. Ready for Stage F2 (Model layer).
+- Next stage:
+  - Stage F2: Model layer (`model/complete.rs`, `model/json.rs`, `model/ledger.rs`, adapter `extra_body`).
+
+
 

@@ -16,6 +16,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::{json, Value};
 
 static DEBUG: OnceLock<Option<Mutex<File>>> = OnceLock::new();
+static EXTRA_KEYS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 const MAX_BYTES: u64 = 5 * 1024 * 1024;
 const BACKUP_NAME: &str = "debug.log.1";
@@ -92,6 +93,28 @@ fn render(kind: &str, value: &Value, key: &str) -> String {
     redact_with(&Value::Object(object).to_string(), key)
 }
 
+/// Register an additional key (e.g. flow role key) to be redacted from logs.
+pub fn register_redacted_key(key: &str) {
+    if key.chars().count() >= 8 {
+        if let Ok(mut keys) = EXTRA_KEYS.lock() {
+            if !keys.iter().any(|k| k == key) {
+                keys.push(key.to_string());
+            }
+        }
+    }
+}
+
+/// Redact with a specific slice of keys.
+pub fn redact_with_keys(s: &str, keys: &[&str]) -> String {
+    let mut out = s.to_string();
+    for key in keys {
+        if key.chars().count() >= 8 {
+            out = out.replace(*key, "[REDACTED]");
+        }
+    }
+    redact_sk_tokens(&out)
+}
+
 /// Replace the configured API key and any `sk-...` token.
 pub fn redact(s: &str) -> String {
     let key = std::env::var("ARQUS_API_KEY").unwrap_or_default();
@@ -104,6 +127,11 @@ pub fn redact_with(s: &str, key: &str) -> String {
     let mut out = s.to_string();
     if key.chars().count() >= 8 {
         out = out.replace(key, "[REDACTED]");
+    }
+    if let Ok(keys) = EXTRA_KEYS.lock() {
+        for extra in keys.iter() {
+            out = out.replace(extra, "[REDACTED]");
+        }
     }
     redact_sk_tokens(&out)
 }

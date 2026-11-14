@@ -10,6 +10,7 @@ mod config;
 mod context;
 mod cost;
 mod debug;
+mod flow;
 mod home;
 mod mcp;
 mod models;
@@ -42,6 +43,13 @@ use crate::session::{latest_session, new_id, sessions_dir, Session};
 async fn main() {
     let cli = Cli::parse();
     debug::init(cli.debug, &home::arqus_home());
+    if let Some(crate::cli::Command::Flow(ref flow_args)) = cli.command {
+        if let Err(err) = flow::cli::run(flow_args).await {
+            eprintln!("error: {err:#}");
+            std::process::exit(1);
+        }
+        return;
+    }
     if let Some(prompt) = cli.prompt.clone() {
         if let Err(err) = print::print_mode(&cli, prompt).await {
             eprintln!("error: {err:#}");
