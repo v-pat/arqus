@@ -29,3 +29,4 @@ fn test_flow_error_display() {
     let err = FlowError::Declined("out of scope".to_string());
     assert_eq!(err.to_string(), "task declined by model: out of scope");
 }
+
