@@ -164,6 +164,22 @@ fn extract_file_ops_merges_and_sorts() {
     assert_eq!(modified, vec!["b.rs".to_string(), "c.rs".to_string()]);
 }
 
+#[test]
+fn extract_file_ops_tracks_mcp_serena_operations() {
+    let entries = vec![Entry {
+        id: "e1".to_string(),
+        parent_id: None,
+        ts: 0,
+        kind: assistant(vec![
+            call("c1", "mcp__serena__get_symbols", "src/reader.rs"),
+            call("c2", "mcp__serena__edit_symbol", "src/writer.rs"),
+        ]),
+    }];
+    let (read, modified) = extract_file_ops(&entries);
+    assert_eq!(read, vec!["src/reader.rs".to_string()]);
+    assert_eq!(modified, vec!["src/writer.rs".to_string()]);
+}
+
 #[tokio::test]
 async fn long_history_compacts_and_context_shrinks() {
     let dir = tmp();
@@ -297,6 +313,7 @@ async fn agent_compacts_after_a_long_turn() {
             arqus_home: dir.join(".arqus-home"),
             user_home: None,
         },
+        mcp: None,
     };
     let (tx, rx) = tokio::sync::mpsc::channel(8);
     drop(rx);

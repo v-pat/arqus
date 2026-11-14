@@ -36,6 +36,7 @@ pub enum CommandAction {
     CycleModel,
     Copy,
     Export,
+    Mcp,
     Prompt(String),
     Skill(String),
 }
@@ -146,6 +147,10 @@ pub fn run(app: &mut App, command: &Command, args: &str) -> Vec<Effect> {
                 Some(path.to_string())
             })]
         }
+        CommandAction::Mcp => {
+            mcp_info(app);
+            Vec::new()
+        }
         CommandAction::ToggleThinking => {
             app.toggle_thinking();
             app.state.show_thinking = app.show_thinking;
@@ -245,6 +250,26 @@ fn rename(app: &mut App, args: &str) {
             app.toast(format!("Session renamed to {name}"), Level::Info);
         }
         Err(err) => app.toast(format!("cannot rename: {err:#}"), Level::Error),
+    }
+}
+
+fn mcp_info(app: &mut App) {
+    let mcp_cfg = crate::mcp::config::McpConfig::load(std::path::Path::new(&app.cwd));
+    if mcp_cfg.servers.is_empty() {
+        app.toast("no MCP servers configured", Level::Info);
+        app.info("No MCP servers configured in mcp.json.");
+    } else {
+        let count = mcp_cfg.servers.len();
+        let mut msg = format!("Configured MCP servers ({count}):\n");
+        for (name, conf) in &mcp_cfg.servers {
+            msg.push_str(&format!(
+                "  • {name}: {} {}\n",
+                conf.command,
+                conf.args.join(" ")
+            ));
+        }
+        app.info(msg.trim_end().to_string());
+        app.toast(format!("{count} MCP server(s) configured"), Level::Info);
     }
 }
 

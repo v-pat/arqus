@@ -23,19 +23,31 @@ pub fn tool_lines(
         ToolState::Ok => (finish_icon("✓", tool), theme.success),
         ToolState::Err => (finish_icon("✗", tool), theme.error),
     };
+    let (display_name, summary_text) =
+        if let Some((server, tool_name)) = crate::mcp::parse_tool_name(&tool.name) {
+            let name_label = format!("mcp:{server}/{tool_name}");
+            let summary = tool
+                .summary
+                .strip_prefix(&name_label)
+                .or_else(|| tool.summary.strip_prefix(tool.name.as_str()))
+                .map(str::trim_start)
+                .unwrap_or(&tool.summary);
+            (name_label, summary)
+        } else {
+            let summary = tool
+                .summary
+                .strip_prefix(tool.name.as_str())
+                .map(str::trim_start)
+                .unwrap_or(&tool.summary);
+            (tool.name.clone(), summary)
+        };
     let icon_width = display_width(&icon);
-    let head = format!("● {}", tool.name);
+    let head = format!("● {display_name}");
     let head_width = display_width(&head);
-    // `summary_for` includes the tool name; the header already shows it.
-    let summary_text = tool
-        .summary
-        .strip_prefix(tool.name.as_str())
-        .map(str::trim_start)
-        .unwrap_or(&tool.summary);
     let mut spans = vec![
         RSpan::styled("● ", Style::default().fg(theme.tool)),
         RSpan::styled(
-            tool.name.clone(),
+            display_name,
             Style::default().fg(theme.tool).add_modifier(Modifier::BOLD),
         ),
     ];

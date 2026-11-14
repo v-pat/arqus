@@ -239,6 +239,7 @@ fn config(cwd: &Path) -> AgentConfig {
             arqus_home: cwd.join(".arqus-home"),
             user_home: Some(cwd.join(".home")),
         },
+        mcp: None,
     }
 }
 

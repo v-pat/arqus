@@ -36,6 +36,15 @@ pub async fn print_mode(cli: &Cli, prompt: String) -> anyhow::Result<()> {
     let limits = resolve_limits(cli, &settings);
     let resources = resources::load_with(&cwd, &settings.skill_folders);
     let mut session = crate::open_session(cli, &cwd_str)?;
+    let (approver, plan) =
+        match safety_setup::resolve_mode(cli.mode.as_deref(), cli.yolo, &settings, false) {
+            Ok(res) => res,
+            Err(err) => {
+                eprintln!("error: {err}");
+                std::process::exit(2);
+            }
+        };
+
     let cfg = AgentConfig {
         cwd: cwd.clone(),
         system_prompt: system_prompt::build_system_prompt(
@@ -46,11 +55,12 @@ pub async fn print_mode(cli: &Cli, prompt: String) -> anyhow::Result<()> {
         context_window: model.context_window,
         compaction: settings.compaction_settings(compaction::CompactionSettings::default()),
         limits,
-        approver: safety_setup::approver(cli.yolo, &settings, false),
+        approver,
         allow_risky: cli.allow_risky,
-        plan: false,
+        plan,
         approvals: Approvals::default(),
         guard: safety_setup::guard(&settings, &cwd),
+        mcp: Some(crate::mcp::McpManager::for_cwd(&cwd)),
     };
     let llm = Llm::from_config(model.clone());
 

@@ -14,13 +14,14 @@ use crate::ai::{default_base_url, default_context_window, split_model_spec, Mode
 use crate::compaction::CompactionSettings;
 use crate::cost::Limits;
 
-/// `approval` in settings.json: ask (default) or auto.
+/// `approval` in settings.json: ask (default), auto or plan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ApprovalMode {
     #[default]
     Ask,
     Auto,
+    Plan,
 }
 
 /// One settings.json file. Every field is optional, so a project file can

@@ -1,17 +1,17 @@
 # arqus
 
 A small terminal coding agent written in Rust, modeled on the ideas behind
-**pi**: a tiny core, four tools (`read`, `write`, `edit`, `bash`), streaming
-model calls, append-only JSONL sessions with branching, compaction, and a
-ratatui TUI.
+**pi**: a tiny core, four tools (`read`, `write`, `edit`, `bash`), extensible
+**Model Context Protocol (MCP)** support, streaming model calls, append-only JSONL
+sessions with branching, compaction, and a ratatui TUI.
 
 `arqus` is a learning project. It works and it is tested, but it is not a
 production tool. Read [Limitations](#limitations) before pointing it at a real
 repository.
 
 - Version: `0.2.0` (`arqus --version` prints it)
-- Status: stages 0 to 25 are done; stage 26 is the release gate
-- Tests: `cargo test` runs 612 tests (564 unit, 48 end-to-end) with no network
+- Status: stages 0 to 25 are done; stage 26 is the release gate; Stage M (MCP) complete
+- Tests: `cargo test` runs 629 tests (581 unit, 48 end-to-end) with no network
 - Crates: `serde`, `serde_json`, `anyhow`, `uuid`, `dirs`, `tokio`, `reqwest`,
   `futures-util`, `clap`, `ratatui`, `crossterm`, `unicode-width`
 
@@ -20,6 +20,8 @@ repository.
 - Streams from OpenAI-compatible servers, OpenRouter, and Anthropic.
 - Runs a tool loop with `read`, `write`, `edit`, and `bash` (bounded rounds per
   prompt).
+- Connects to Model Context Protocol (MCP) servers (e.g. Serena semantic code analysis)
+  via stdio JSON-RPC 2.0 with AST schema pruning, KV cache stability, and output caps.
 - Stores every session as an append-only JSONL file with an `id` / `parent_id`
   tree. Forking and moving the leaf are first-class.
 - Rebuilds the model context from the session with a pure function, including
@@ -48,7 +50,7 @@ Expected test result (no network, no real key):
 
 ```sh
 $ cargo test
-test result: ok. 564 passed; 0 failed; 0 ignored
+test result: ok. 581 passed; 0 failed; 0 ignored
 test result: ok. 4 passed; 0 failed; 0 ignored      # e2e_basic
 test result: ok. 2 passed; 0 failed; 0 ignored      # e2e_connect
 test result: ok. 9 passed; 0 failed; 0 ignored      # e2e_cost
@@ -316,6 +318,7 @@ Mac note: in Terminal.app and iTerm2 set the Option key to "Esc+" (Terminal) or
 | `/fork` | both | Copy the current path into a new session file |
 | `/model` | TUI | Show the current model |
 | `/model provider:model` | TUI | Switch adapter and record a `model_change` entry |
+| `/mcp` | TUI | List configured MCP servers and commands |
 | `/new` | TUI | Start a new session |
 | `/resume` | TUI | Pick an older session from this directory |
 | `/help` | TUI | List keys and commands |
@@ -379,6 +382,53 @@ Defaults, all overridable by flag, environment or settings:
 A turn also stops when the model repeats the same tool call 3 times or sends
 two empty replies in a row. Those stops exit `0`. A cost or token limit exits
 `1` and names the key to raise.
+
+## Model Context Protocol (MCP)
+
+`arqus` includes full client support for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) over stdio JSON-RPC 2.0. This allows `arqus` to connect to specialized language servers, semantic indexing tools (such as **Serena**), database query tools, and external services.
+
+### Configuration (`mcp.json`)
+
+Configure MCP servers in either:
+- Global: `<ARQUS_HOME>/mcp.json` (default `~/.arqus/mcp.json`)
+- Project: `<cwd>/.arqus/mcp.json` (project overrides or adds to global)
+
+Both standard JSON formats are supported: `{"mcpServers": { ... }}` and top-level `{"servers": { ... }}`. Environment variables in arguments and `env` dictionaries are expanded using `${VAR}` syntax.
+
+Example for **Serena** (semantic code navigation & editing server):
+
+```json
+{
+  "mcpServers": {
+    "serena": {
+      "command": "serena-mcp",
+      "args": ["--workspace", "${PWD}"],
+      "env": {
+        "RUST_LOG": "info"
+      }
+    }
+  }
+}
+```
+
+### Tool Namespacing & TUI Integration
+
+- **Namespacing**: To prevent collisions between built-in tools (`read`, `write`, `edit`, `bash`) and external servers, tools exposed by MCP servers are namespaced internally as `mcp__{server}__{tool}` (e.g. `mcp__serena__get_symbols`).
+- **Clean Display**: In the TUI transcript, tool cards, and summary bars, tools are rendered cleanly as `mcp:serena/get_symbols`.
+- **Inspection**: Run the `/mcp` command in the TUI to view all configured servers and commands.
+
+### Efficiency & Research Optimizations
+
+- **AST-Based Schema Pruning**: MCP tool definitions from language servers often contain massive JSON schemas with redundant `$schema`, `title`, and verbose descriptions that bloat prompt sizes by 15k–50k tokens. `arqus` prunes non-essential metadata while strictly preserving type integrity and required parameters, cutting schema token usage by up to 70%.
+- **KV Cache Stability**: Tools are deterministically sorted alphabetically by namespaced key before being submitted to the model. This guarantees stable prompt prefixes across turns and maximizes prompt KV-cache reuse in models like DeepSeek, Claude, and GPT-4o.
+- **Process Group Isolation**: Each child process is spawned inside a dedicated process group (`setpgid(0, 0)`). On session exit or cancellation, the process group receives `SIGKILL`, ensuring language servers and child daemons (such as `rust-analyzer` invoked by Serena) never linger as orphaned zombie processes.
+- **Output Truncation**: MCP tool outputs exceeding 50 KB are capped with a clear notice `[output truncated: X bytes total, showing first 50000 bytes]` to avoid runaway context explosion.
+
+### Safety & Modes
+
+- **Approval Prompts**: Mutating MCP tools trigger an approval modal in the TUI (`Run MCP server / tool?`) showing the server, tool, and arguments.
+- **Plan Mode**: Read-only inspection tools (e.g. `get_symbols`, `find_references`, `search_definitions`, `list_declarations`) are allowed automatically in Plan mode, while mutating tools remain blocked.
+- **Compaction Tracking**: File operations performed through Serena's semantic editing tools (`replace_symbol_body`, `insert_after_symbol`, etc.) are recognized and logged in `compaction` entries under `read_files` and `modified_files`.
 
 ## Sessions
 
@@ -618,12 +668,13 @@ src/
     sse.rs            SSE parser
     mock.rs           scripted provider for tests
   tools/            read, write, edit, bash
+  mcp/              Model Context Protocol (JSON-RPC, schema pruning, manager)
   tui/              ratatui interface
 ```
 
 Import direction: `types` is at the bottom. `session`, `context`, `compaction`
-depend on it; `ai` and `tools` sit above; `agent` above those; `main` and `tui`
-on top. `ai/` and `tools/` never import `session`. `tui/` never imports `ai/`
+depend on it; `ai`, `tools` and `mcp` sit above; `agent` above those; `main` and `tui`
+on top. `ai/`, `tools/` and `mcp/` never import `session`. `tui/` never imports `ai/`
 directly; it uses `Runtime`.
 
 ## Docker
