@@ -1543,3 +1543,33 @@
   - Process groups ensure all child processes spawned by language server backends (like Serena's rust-analyzer or python subprocesses) are killed cleanly without orphan processes.
 - Known problems / TODO:
   - Remote HTTP/SSE MCP servers can be added as a subsequent transport layer.
+
+## Stage: Mode Verification, Efficiency, and Mode Safety Testing   [DONE]
+- Files created or changed:
+  - `src/tui/widgets/tool_card.rs`: Cleaned up unused variable warnings (`display_name`, `summary_text`).
+  - `src/tui/mod.rs`: Extracted and refined `init_app` to synchronize `runtime.cfg.approver` and `runtime.cfg.plan` directly with `app.mode` (resolving the startup auto-mode bug).
+  - `src/tui/startup_tests.rs`: Added unit tests verifying startup mode synchronization (`init_app_syncs_auto_mode_from_state_default_mode`, `init_app_syncs_plan_mode_when_cfg_plan_is_true`, `init_app_defaults_to_ask_mode`).
+  - `src/tui/mode_tests.rs`: Comprehensive TUI driver tests covering all 3 modes (`ask`, `auto`, `plan`), verifying approval prompts, automated execution, risky bash guard, read-only plan enforcement, and chip/border colors.
+  - `src/cli.rs`: Added CLI `--mode <ask|auto|plan>` flag.
+  - `src/settings.rs`: Added `ApprovalMode::Plan` to settings deserialization.
+  - `src/safety_setup.rs`: Added `resolve_mode` helper reconciling CLI `--mode`, `--plan`, `--yolo`, and `settings.approval`.
+  - `src/main.rs`, `src/print.rs`: Wired `resolve_mode` into startup for both interactive and print modes.
+  - `src/agent_safety.rs`: Enhanced `PLAN_NOTE` in prompt to explicitly instruct LLMs upfront that only `read` is allowed in Plan mode, eliminating redundant mutating tool attempts.
+  - `tests/e2e_safety.rs`: Added end-to-end integration tests for `--mode <ask|auto|plan>`.
+  - `docs/BUGS.md`: Documented startup mode sync bug and fix per A15 bug protocol.
+- What works (command + short real output):
+  - `cargo test mode_tests` -> `test result: ok. 5 passed; 0 failed; finished in 0.02s`
+  - `cargo test --bin arqus` -> `test result: ok. 590 passed; 0 failed; finished in 1.14s`
+  - `cargo test --test e2e_safety` -> `test result: ok. 7 passed; 0 failed; finished in 0.14s`
+  - `cargo test` (all unit and integration test binaries) -> `test result: ok. 641 passed; 0 failed; 6 ignored (live)`
+  - `cargo fmt --check` -> clean
+  - `cargo clippy --tests` -> clean on all modified code
+- Assumptions:
+  - In Plan mode, red output in the TUI is the deliberate safety refusal (`ToolState::Err`) blocking unauthorized write/edit/bash actions.
+  - LLM efficiency in Plan mode is significantly improved by explicit negative prompting in `PLAN_NOTE`, discouraging futile mutating tool calls.
+  - Startup mode synchronization ensures `runtime.cfg.approver` matches the active visual UI mode (`app.mode`) regardless of whether configured via CLI `--mode` or `state.json`.
+- Known problems / TODO:
+  - All modes verified and running efficiently with full test coverage.
+- Next stage:
+  - Continued development and production usage.
+

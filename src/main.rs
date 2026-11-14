@@ -92,6 +92,13 @@ async fn interactive_mode(cli: &Cli) -> anyhow::Result<()> {
         sessions_dir(&cwd_str)
     };
 
+    let (approver, plan) =
+        match safety_setup::resolve_mode(cli.mode.as_deref(), cli.yolo, &settings, true) {
+            Ok(res) => res,
+            Err(err) => exit_config(err),
+        };
+    let auto = approver == safety::Approver::Auto;
+
     let cfg = AgentConfig {
         cwd: cwd.clone(),
         system_prompt: system_prompt::build_system_prompt(
@@ -102,9 +109,9 @@ async fn interactive_mode(cli: &Cli) -> anyhow::Result<()> {
         context_window: model.context_window,
         compaction: settings.compaction_settings(compaction::CompactionSettings::default()),
         limits,
-        approver: safety_setup::approver(cli.yolo, &settings, true),
+        approver,
         allow_risky: cli.allow_risky,
-        plan: false,
+        plan,
         approvals: Approvals::default(),
         guard: safety_setup::guard(&settings, &cwd),
         mcp: Some(mcp::McpManager::for_cwd(&cwd)),
@@ -128,7 +135,7 @@ async fn interactive_mode(cli: &Cli) -> anyhow::Result<()> {
         cwd: cwd_str,
         resources,
         provider,
-        auto: cli.yolo || settings.approval == Some(settings::ApprovalMode::Auto),
+        auto,
         connect_on_start,
         models_on_start,
         resume_on_start: cli.resume,

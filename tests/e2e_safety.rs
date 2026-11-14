@@ -153,3 +153,105 @@ fn risky_bash_is_refused_in_auto_mode_without_allow_risky() {
         "tool result: {text}"
     );
 }
+
+#[test]
+fn plan_mode_blocks_mutating_tools_in_e2e() {
+    let project = TempDir::new("plan_project");
+    let home = TempDir::new("plan_home");
+    fs::write(project.path.join("existing.txt"), "hello plan").unwrap();
+    let fake = FakeLlm::start(vec![
+        Reply::sse(sse_tool_call_json(
+            "call_1",
+            "read",
+            &json!({"path": "existing.txt"}),
+        )),
+        Reply::sse(sse_tool_call_json(
+            "call_2",
+            "write",
+            &json!({"path": "output.txt", "content": "forbidden"}),
+        )),
+        Reply::sse(sse_text(&["plan completed"])),
+    ]);
+
+    let out = run_arqus_without_yolo(
+        &project.path,
+        &home.path,
+        &fake.url,
+        &["--no-session", "--mode", "plan", "-p", "plan the change"],
+        &[],
+    );
+
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
+    assert!(
+        !project.path.join("output.txt").exists(),
+        "mutating tools must not modify filesystem in plan mode"
+    );
+    let requests = fake.requests();
+    assert_eq!(requests.len(), 3);
+    // Request 1: system prompt must carry the plan note
+    assert!(requests[0]
+        .body
+        .contains("Plan mode: changes are disabled. Describe the plan instead."));
+    // Request 2: read tool result succeeds
+    let read_res = tool_result_text(&requests[1].body);
+    assert!(
+        read_res.contains("hello plan"),
+        "read tool result: {read_res}"
+    );
+    // Request 3: write tool result is refused with PLAN_REFUSAL
+    let write_res = tool_result_text(&requests[2].body);
+    assert!(
+        write_res.contains("Plan mode: changes are disabled. Describe the plan instead."),
+        "write tool result: {write_res}"
+    );
+}
+
+#[test]
+fn auto_mode_runs_safe_tools_without_approval_in_e2e() {
+    let project = TempDir::new("auto_project");
+    let home = TempDir::new("auto_home");
+    let fake = FakeLlm::start(vec![
+        Reply::sse(sse_tool_call_json(
+            "call_1",
+            "write",
+            &json!({"path": "auto.txt", "content": "automated success"}),
+        )),
+        Reply::sse(sse_text(&["done"])),
+    ]);
+
+    let out = run_arqus_without_yolo(
+        &project.path,
+        &home.path,
+        &fake.url,
+        &["--no-session", "--mode", "auto", "-p", "write a file"],
+        &[],
+    );
+
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
+    assert!(
+        project.path.join("auto.txt").exists(),
+        "auto mode must execute without prompting"
+    );
+    assert_eq!(
+        fs::read_to_string(project.path.join("auto.txt")).unwrap(),
+        "automated success"
+    );
+}
+
+#[test]
+fn invalid_mode_flag_exits_2() {
+    let project = TempDir::new("invalid_mode_project");
+    let home = TempDir::new("invalid_mode_home");
+    let fake = FakeLlm::start(vec![]);
+
+    let out = run_arqus_without_yolo(
+        &project.path,
+        &home.path,
+        &fake.url,
+        &["--no-session", "--mode", "unknown_mode", "-p", "hello"],
+        &[],
+    );
+
+    assert_eq!(out.status.code(), Some(2));
+    assert!(stderr(&out).contains("unknown mode 'unknown_mode': expected ask, auto, or plan"));
+}

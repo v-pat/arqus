@@ -15,7 +15,8 @@ pub const RISKY_MARKER: &str = "RISKY";
 pub const DENIED: &str = "The user denied this tool call.";
 pub const APPROVAL_REQUIRED: &str = "Approval required. Run arqus with --yolo to allow this.";
 pub const PLAN_REFUSAL: &str = "Plan mode: changes are disabled. Describe the plan instead.";
-pub const PLAN_NOTE: &str = "Plan mode: changes are disabled. Describe the plan instead.";
+pub const PLAN_NOTE: &str =
+    "Plan mode: changes are disabled. Describe the plan instead. Only read is permitted; do not call write, edit, or bash.";
 
 /// Check one call. `Err` is the tool result to send back to the model.
 ///

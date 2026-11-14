@@ -68,6 +68,10 @@ mod editor_tests;
 #[path = "approval_tests.rs"]
 mod approval_tests;
 
+#[cfg(test)]
+#[path = "mode_tests.rs"]
+mod mode_tests;
+
 use std::io::stdout;
 use std::path::PathBuf;
 
@@ -131,7 +135,7 @@ fn startup_overlays(
     }
 }
 
-pub async fn run(startup: Startup) -> anyhow::Result<()> {
+pub(crate) fn init_app(startup: Startup) -> (App, Runtime, Vec<Effect>) {
     let model = startup.runtime.model_name.clone();
     let window = startup.runtime.cfg.context_window;
     let provider = startup.provider.clone();
@@ -157,13 +161,18 @@ pub async fn run(startup: Startup) -> anyhow::Result<()> {
     app.settings = startup.settings;
     app.arqus_home = startup.arqus_home;
     runtime.cfg.compaction.enabled = app.state.compaction;
-    app.mode = if auto || app.state.default_mode.as_deref() == Some("auto") {
+    app.mode = if runtime.cfg.plan {
+        footer::Mode::Plan
+    } else if auto || app.state.default_mode.as_deref() == Some("auto") {
         footer::Mode::Auto
     } else {
         footer::Mode::Ask
     };
-    // The warning is for the first switch during a session, not for a launch
-    // that already chose auto with --yolo or settings approval = "auto".
+    runtime.cfg.plan = app.mode == footer::Mode::Plan;
+    runtime.cfg.approver = match app.mode {
+        footer::Mode::Ask | footer::Mode::Plan => crate::safety::Approver::Interactive,
+        footer::Mode::Auto => crate::safety::Approver::Auto,
+    };
     app.auto_warned = app.mode == footer::Mode::Auto;
     let depth = ColorDepth::from_env();
     app.theme = theme_file::startup_theme(&app.arqus_home, app.state.theme.as_deref(), depth);
@@ -197,18 +206,21 @@ pub async fn run(startup: Startup) -> anyhow::Result<()> {
         app.toast(notice, msg::Level::Warn);
     }
 
-    let startup_effects = {
-        let mut effects = vec![Effect::ScanFiles];
-        if models_on_start {
-            effects.push(Effect::FetchModels {
-                provider: provider.clone(),
-            });
-        }
-        if resume_on_start {
-            effects.push(Effect::LoadSessions);
-        }
-        effects
-    };
+    let mut startup_effects = vec![Effect::ScanFiles];
+    if models_on_start {
+        startup_effects.push(Effect::FetchModels {
+            provider: provider.clone(),
+        });
+    }
+    if resume_on_start {
+        startup_effects.push(Effect::LoadSessions);
+    }
+    (app, runtime, startup_effects)
+}
+
+pub async fn run(startup: Startup) -> anyhow::Result<()> {
+    let resources = startup.resources.clone();
+    let (mut app, runtime, startup_effects) = init_app(startup);
     let mut terminal = ratatui::init();
     let paste_on = ratatui::crossterm::execute!(stdout(), EnableBracketedPaste).is_ok();
     let mouse_on = app.state.mouse;

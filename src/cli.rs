@@ -96,6 +96,9 @@ pub struct Cli {
     /// Allow risky bash commands in auto mode (rm -rf /, sudo, ...)
     #[arg(long = "allow-risky")]
     pub allow_risky: bool,
+    /// Execution mode: ask (default), auto (same as --yolo), or plan
+    #[arg(long = "mode", value_name = "MODE")]
+    pub mode: Option<String>,
 }
 
 /// Limits: CLI flag beats environment, which beats settings, which beats
