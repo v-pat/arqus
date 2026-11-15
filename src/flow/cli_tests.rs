@@ -91,3 +91,105 @@ fn test_flow_report_subcommand_parses() {
         _ => panic!("Expected Report subcommand"),
     }
 }
+
+#[test]
+fn test_cli_parse_flow_run_all_options() {
+    let cli = Cli::try_parse_from([
+        "arqus",
+        "flow",
+        "run",
+        "build complete system",
+        "--repo",
+        "/custom/repo",
+        "--orchestrator-model",
+        "custom-orch",
+        "--worker",
+        "custom-worker",
+        "--max-cost",
+        "2.75",
+        "--max-cloud-tokens",
+        "150000",
+        "--dry-plan",
+        "--log-prompts",
+        "--debug",
+    ])
+    .unwrap();
+
+    match cli.command {
+        Some(Command::Flow(FlowArgs {
+            command: FlowCommand::Run(args),
+        })) => {
+            assert_eq!(args.objective, "build complete system");
+            assert_eq!(args.repo, "/custom/repo");
+            assert_eq!(args.orchestrator_model.as_deref(), Some("custom-orch"));
+            assert_eq!(args.worker.as_deref(), Some("custom-worker"));
+            assert_eq!(args.max_cost, Some(2.75));
+            assert_eq!(args.max_cloud_tokens, Some(150000));
+            assert!(args.dry_plan);
+            assert!(args.log_prompts);
+            assert!(args.debug);
+        }
+        _ => panic!("Expected Run subcommand with all options"),
+    }
+}
+
+#[test]
+fn test_cli_parse_flow_resume_with_repo() {
+    let cli = Cli::try_parse_from([
+        "arqus",
+        "flow",
+        "resume",
+        "run-resume-123",
+        "--repo",
+        "/path/to/repo",
+    ])
+    .unwrap();
+    match cli.command {
+        Some(Command::Flow(FlowArgs {
+            command: FlowCommand::Resume(args),
+        })) => {
+            assert_eq!(args.run_id, "run-resume-123");
+            assert_eq!(args.repo, "/path/to/repo");
+        }
+        _ => panic!("Expected Resume subcommand"),
+    }
+}
+
+#[test]
+fn test_cli_parse_flow_report_with_repo() {
+    let cli = Cli::try_parse_from([
+        "arqus",
+        "flow",
+        "report",
+        "run-report-123",
+        "--repo",
+        "/path/to/repo",
+    ])
+    .unwrap();
+    match cli.command {
+        Some(Command::Flow(FlowArgs {
+            command: FlowCommand::Report(args),
+        })) => {
+            assert_eq!(args.run_id, "run-report-123");
+            assert_eq!(args.repo, "/path/to/repo");
+        }
+        _ => panic!("Expected Report subcommand"),
+    }
+}
+
+#[test]
+fn test_docker_wrapper_forwards_role_keys() {
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let script_path = std::path::Path::new(manifest_dir)
+        .join("scripts")
+        .join("arqus-docker");
+    let content = std::fs::read_to_string(&script_path).expect("read arqus-docker script");
+    assert!(
+        content.contains("ARQUS_ORCHESTRATOR_KEY"),
+        "arqus-docker must forward ARQUS_ORCHESTRATOR_KEY"
+    );
+    assert!(
+        content.contains("ARQUS_WORKER_KEY"),
+        "arqus-docker must forward ARQUS_WORKER_KEY"
+    );
+}

@@ -52,17 +52,26 @@ pub struct RunArgs {
 pub struct ResumeArgs {
     /// Run ID to resume
     pub run_id: String,
+    /// Path to git repository (default: current directory)
+    #[arg(long, default_value = ".")]
+    pub repo: String,
 }
 
 #[derive(Debug, Args, Clone, PartialEq, Eq)]
 pub struct ReportArgs {
     /// Run ID to report on
     pub run_id: String,
+    /// Path to git repository (default: current directory)
+    #[arg(long, default_value = ".")]
+    pub repo: String,
 }
 
 pub async fn run(args: &FlowArgs) -> anyhow::Result<()> {
     match &args.command {
         FlowCommand::Run(run_args) => {
+            if run_args.debug {
+                crate::debug::init(true, &crate::home::arqus_home());
+            }
             if run_args.dry_plan {
                 run_dry_plan(run_args).await
             } else {
@@ -73,9 +82,9 @@ pub async fn run(args: &FlowArgs) -> anyhow::Result<()> {
             crate::flow::engine::resume::run_resume(resume_args).await
         }
         FlowCommand::Report(report_args) => {
-            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-            let repo = std::fs::canonicalize(&cwd)
-                .map_err(|e| anyhow::anyhow!("failed to resolve cwd: {e}"))?;
+            let repo = std::fs::canonicalize(&report_args.repo).map_err(|e| {
+                anyhow::anyhow!("failed to resolve repo path '{}': {e}", report_args.repo)
+            })?;
             let report =
                 crate::flow::engine::report::load_report_from_dir(&repo, &report_args.run_id)
                     .map_err(anyhow::Error::new)?;

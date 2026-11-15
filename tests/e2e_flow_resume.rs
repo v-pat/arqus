@@ -115,4 +115,3 @@ fn s13_crash_then_resume() {
     assert!(lib_rs.contains("pub fn f2()"));
     assert!(lib_rs.contains("pub fn f3()"));
 }
-

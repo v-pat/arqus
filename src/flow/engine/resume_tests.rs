@@ -129,4 +129,3 @@ fn test_reset_tasks_for_resume_resets_running_and_redesigning_only() {
     let t4 = state.tasks.get("T04").unwrap();
     assert_eq!(t4.status, TaskStatus::Pending); // Kept Pending
 }
-

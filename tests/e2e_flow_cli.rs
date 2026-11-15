@@ -146,3 +146,43 @@ fn s20_key_hygiene() {
         assert!(!content.contains(worker_key), "worker key in debug.log");
     }
 }
+
+#[test]
+fn test_flow_run_appends_to_stats_jsonl() {
+    let task = single_task("T01", "worker", &["cargo check"], &["src/lib.rs"]);
+    let plan = plan_json(vec![task], vec!["cargo check"]);
+
+    let orch_server = MockServer::start(vec![Reply::sse(sse_text(&[&plan]))]);
+    let worker_server = MockServer::start(vec![Reply::sse(sse_text(&[&make_file_edit(
+        "src/lib.rs",
+        "pub fn s_stats() {}\n",
+    )]))]);
+
+    let fixture = FlowTestFixture::new(&orch_server.url, &worker_server.url);
+    let output = fixture.run_flow("stats run test");
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stdout:\n{}\nstderr:\n{}",
+        stdout(&output),
+        stderr(&output)
+    );
+
+    let stats_path = fixture.home.path.join("flow").join("stats.jsonl");
+    assert!(
+        stats_path.exists(),
+        "stats.jsonl should be created at {}",
+        stats_path.display()
+    );
+
+    let content = fs::read_to_string(&stats_path).unwrap();
+    let lines: Vec<&str> = content.lines().collect();
+    assert_eq!(lines.len(), 1, "expected 1 stat line for 1 task");
+
+    let val: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+    assert_eq!(val["first_attempt_pass"], true);
+    assert_eq!(val["attempts"], 1);
+    assert_eq!(val["redesigns"], 0);
+    assert_eq!(val["takeover"], false);
+    assert!(val["tokens"].as_u64().unwrap() > 0);
+}

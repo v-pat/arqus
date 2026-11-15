@@ -41,6 +41,14 @@ pub fn emit_event(path: &Path, event_type: &str, task_id: Option<&str>, data: Va
         data,
     };
     let _ = append_event(path, &event);
+    crate::debug::log(
+        "flow_event",
+        serde_json::json!({
+            "type": event_type,
+            "task_id": task_id,
+            "data": event.data,
+        }),
+    );
 }
 
 #[cfg(test)]

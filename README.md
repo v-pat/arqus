@@ -193,6 +193,41 @@ Exit codes:
 - The generic adapter's default base URL is OpenRouter's. Set `ARQUS_BASE_URL`
   for another endpoint.
 
+## Flow
+
+`arqus flow` is a multi-model collaborative execution harness designed to minimise expensive cloud tokens by pairing a capable cloud orchestrator with fast, low-cost local worker models (e.g. Qwen or Llama via Ollama/vLLM).
+
+The orchestrator breaks natural language objectives into discrete, contract-bounded nano-tasks. Local workers implement one-shot edits against an isolated git worktree, and the harness verifies each change with deterministic commands before committing.
+
+### CLI
+
+- `arqus flow run OBJECTIVE [--repo .] [--orchestrator-model NAME] [--worker NAME] [--max-cost DOLLARS] [--max-cloud-tokens N] [--dry-plan] [--log-prompts] [--debug]`  
+  Plans and executes tasks. `--dry-plan` plans and validates without executing or touching the repository.
+- `arqus flow resume RUN_ID [--repo .]`  
+  Resumes an interrupted or budget-stopped flow run from its last accepted commit.
+- `arqus flow report RUN_ID [--repo .]`  
+  Prints a formatted report of task statuses, attempts, redesigns, and token usage for a run.
+- `arqus flow models-check`  
+  Performs live health checks against all configured orchestrator and worker models.
+
+### How it works
+
+1. **Planning**: The orchestrator inspects the repository map and task objectives to produce a DAG of `TaskContract` items (with strict path constraints, context files, and verification commands).
+2. **Execution**: The scheduler deterministically picks ready tasks. Local workers receive concise prompts and output structured `SEARCH`/`REPLACE` or whole `FILE` blocks.
+3. **Deterministic Verification**: Edits are applied atomically in memory. The harness validates allowed file scopes, line count caps, and executes allowlisted test commands.
+4. **Fallback Ladder**: If a worker fails, it retries with feedback. If worker attempts are exhausted, the orchestrator redesigns (revises the contract, splits into subtasks, or executes an orchestrator takeover).
+5. **Atomic State & Accounting**: All transitions and token tallies are persisted atomically to `.arqus/flow/<run_id>/state.json` and `usage.jsonl`. At run end, task statistics append to `<ARQUS_HOME>/flow/stats.jsonl`.
+
+### Honest limitations
+
+- **Sequential execution only**: v1 processes ready tasks one at a time within a single worktree branch (`arqus/flow/<run_id>`). Parallel execution is not supported.
+- **One-shot workers**: Workers produce edits in a single turn without tool calls, loops, or shell access.
+- **Clean Git repo required**: Flow branches from HEAD and refuses to start on a dirty repository.
+- **No automatic merging**: Completed runs leave commits on `arqus/flow/<run_id>`. The user reviews with `git diff` and merges manually.
+- **Deterministic verification only**: Task acceptance is strictly determined by command exit codes and scope checks; there is no LLM judge.
+- **No TUI integration**: Flow operates exclusively in CLI / print mode.
+- **No auto-repair for final verify**: If final repository-wide verification fails after all tasks pass, the run fails with exit code 1.
+
 ## Configuration
 
 ### Environment variables

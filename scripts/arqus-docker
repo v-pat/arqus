@@ -4,7 +4,10 @@
 set -eu
 
 IMAGE="${ARQUS_IMAGE:-arqus:dev}"
-: "${ARQUS_API_KEY:?set ARQUS_API_KEY first}"
+if [ -z "${ARQUS_API_KEY:-}" ] && [ -z "${ARQUS_ORCHESTRATOR_KEY:-}" ]; then
+    echo "error: set ARQUS_API_KEY or ARQUS_ORCHESTRATOR_KEY first" >&2
+    exit 1
+fi
 
 # Guardrail: Never mount the host home directory or root filesystem accidentally
 if [ "$PWD" = "$HOME" ] || [ "$PWD" = "/" ]; then
@@ -39,6 +42,7 @@ exec docker run --rm $TTY \
   $NET_OPTS \
   --memory="${ARQUS_DOCKER_MEMORY:-4g}" --cpus="${ARQUS_DOCKER_CPUS:-4}" --pids-limit=512 \
   -e ARQUS_API_KEY -e ARQUS_MODEL -e ARQUS_PROVIDER -e ARQUS_BASE_URL -e ARQUS_CONTEXT_WINDOW \
+  -e ARQUS_ORCHESTRATOR_KEY -e ARQUS_WORKER_KEY \
   $WORK_MOUNT \
   -v "$STATE":/home/agent/.arqus \
   -w /work \

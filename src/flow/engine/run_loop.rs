@@ -165,6 +165,20 @@ pub async fn run_flow(run_args: &RunArgs) -> anyhow::Result<()> {
         json!({ "status": if success { "finished" } else { "failed" } }),
     );
 
+    let default_worker_model = config
+        .workers
+        .iter()
+        .find(|w| w.name == config.routing.default_worker)
+        .or_else(|| config.workers.first())
+        .map(|w| w.model.as_str())
+        .unwrap_or("worker");
+    let _ = crate::flow::engine::stats::record_run_stats(
+        &run_state,
+        &ledger,
+        default_worker_model,
+        &config.orchestrator.model,
+    );
+
     let totals = ledger.totals();
     let elapsed = start_time.elapsed().as_secs();
     let mut done_count = 0;

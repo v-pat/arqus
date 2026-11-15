@@ -1824,37 +1824,31 @@
 - Next stage:
   - Stage F8c: Planning failures, resume, budget, report (`engine/run_loop.rs` extensions, budget ledger checks).
 
-## Stage F8c: Planning failures, resume, budget, report   [DONE]
+## Stage F9: CLI wiring, stats, Docker, docs   [DONE]
 - Files created or changed:
-  - `src/flow/engine/mod.rs`: declared `pub mod budget;`, `pub mod report;`, `pub mod resume;`.
-  - `src/flow/engine/budget.rs`, `src/flow/engine/budget_tests.rs`: implemented `check_cloud_budget` enforcing `limits.max_cloud_tokens_per_run` and cost limits on cloud roles, returning `FlowError::BudgetExceeded` naming the key to raise.
-  - `src/flow/engine/report.rs`, `src/flow/engine/report_tests.rs`: implemented `generate_report`, `render_report`, and `load_report_from_dir`, producing per-task breakdown and exact matching totals against the ledger.
-  - `src/flow/engine/resume.rs`, `src/flow/engine/resume_tests.rs`: implemented `run_resume`, verifying worktree HEAD against `find_last_accepted_commit`, resetting dirty changes via `reset_hard_clean`, resetting Running/Redesigning tasks back to Ready, and continuing the execution loop without re-running accepted tasks.
-  - `src/flow/errors.rs`, `src/flow/errors_tests.rs`: added `exit_code(&self) -> i32` returning 2 for bad configuration/usage errors and 1 for execution failures.
-  - `src/flow/planning/planner.rs`, `src/flow/planning/planner_repair_tests.rs`: added budget checking before planner LLM calls and added `test_planner_stops_when_cloud_budget_exceeded`.
-  - `src/flow/engine/run_loop_task.rs`, `src/flow/engine/task_accept.rs`: added cloud budget checking before orchestrator redesign and takeover calls, marking state `RunStatus::BudgetStopped` and saving state.
-  - `src/flow/engine/run_loop.rs`: added stderr summary output format `[arqus flow] tasks=... done=... failed=... cloud_in=... cloud_out=... local_in=... local_out=... cost=... time=...s` and typed error propagation.
-  - `src/flow/cli.rs`, `src/flow/cli_tests.rs`: wired `FlowCommand::Resume` and `FlowCommand::Report` subcommands.
-  - `src/flow/model/ledger.rs`: added `Ledger::load(path)` to load existing `usage.jsonl` files.
-  - `src/main.rs`: updated flow CLI error dispatch to inspect `FlowError::exit_code` and exit with 1 or 2 accordingly.
-  - `tests/common/mod.rs`: added `run_flow_args` and `run_id` helpers to `FlowTestFixture`.
-  - `tests/e2e_flow_plan_repairs.rs`: added end-to-end scenarios S8 (invalid JSON repair), S9 (worker limits repair), S10 (repair budget exhausted), S12 (non-allowlisted verify command rejected).
-  - `tests/e2e_flow_resume.rs`: added end-to-end scenario S13 (kill during execution and resume without re-running accepted tasks).
-  - `tests/e2e_flow_budget.rs`: added end-to-end scenario S14 (cloud budget exceeded mid-run with resumable state).
-  - `tests/e2e_flow_cli.rs`: added end-to-end scenarios S15 (dirty repository exits 1 before creation), S18 (existing CLI unchanged), S20 (key hygiene in stdout, stderr, logs, and state).
+  - `src/flow/engine/mod.rs`: declared `pub mod stats;`.
+  - `src/flow/engine/stats.rs`, `src/flow/engine/stats_tests.rs`, `src/flow/engine/stats_build_tests.rs`: implemented `TaskStatRecord` (exact serde representation: `model`, `category`, `first_attempt_pass`, `attempts`, `redesigns`, `takeover`, `tokens`), `build_task_stats` (extracting task metrics and model from ledger or config), `append_run_stats` (safe JSON line file append), and `record_run_stats` (appending to `<ARQUS_HOME>/flow/stats.jsonl`).
+  - `src/flow/engine/run_loop.rs`, `src/flow/engine/resume.rs`: wired `record_run_stats` invocation at run end (upon reaching `Finished` or `Failed`).
+  - `src/flow/engine/events.rs`: wired debug event forwarding to `crate::debug::log` for flow event auditing.
+  - `src/flow/cli.rs`, `src/flow/cli_tests.rs`: added optional `--repo` to `ResumeArgs` and `ReportArgs`, ensured `--debug` initializes debug logging, added unit tests covering all `arqus flow` commands/flags and Docker wrapper key forwarding.
+  - `tests/e2e_flow_cli.rs`: added `test_flow_run_appends_to_stats_jsonl` verifying end-to-end `arqus flow run` execution against mock servers creating `<ARQUS_HOME>/flow/stats.jsonl` with correct task statistics.
+  - `scripts/arqus-docker`: updated to forward `ARQUS_ORCHESTRATOR_KEY` and `ARQUS_WORKER_KEY`, and allow either `ARQUS_API_KEY` or `ARQUS_ORCHESTRATOR_KEY` to be set.
+  - `.env.example`: added documented examples for role key variables (`ARQUS_ORCHESTRATOR_KEY`, `ARQUS_WORKER_KEY`).
+  - `README.md`: added a comprehensive `## Flow` section documenting workflow, CLI commands, configuration in `settings.json`, and honest v1 limitations.
 - What works (command + short real output):
-  - `cargo test --bin arqus flow` -> `test result: ok. 212 passed; 0 failed; 0 ignored; finished in 1.15s`
-  - `cargo test --test 'e2e_flow_*'` -> `test result: ok. 20 passed; 0 failed; 0 ignored; finished in 5.46s` (S1 to S20 all pass)
+  - `cargo test --bin arqus flow` -> `test result: ok. 225 passed; 0 failed; 0 ignored; finished in 1.03s`
+  - `cargo test --test 'e2e_flow_*'` -> `test result: ok. 21 passed; 0 failed; 0 ignored; finished in 5.48s`
   - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
   - `./scripts/test-audit-flow.sh` -> `Tests passed: 30, failed: 0. All audit-flow tests passed!`
   - `./scripts/check.sh` -> `all checks passed`
 - Assumptions:
-  - In `find_last_accepted_commit`, when available `events.jsonl` is checked for the last `task_accepted` commit; if absent, the latest commit recorded on completed tasks in `RunState` or `base_commit` is used.
-  - In `run_report`, output is rendered via `render_report` and printed in `cli.rs`, keeping all `println!` calls strictly within `cli.rs` in compliance with flow audit rules.
+  - In `build_task_stats`, tasks in status `Superseded` (resulting from redesign split) are excluded from the stats file since their replacement subtasks represent the evaluated executions.
+  - For tasks with multiple attempts across redesigns or takeover, attempts reflect `worker_attempts + takeover_attempts`, and tokens reflect total input and output across all ledger records associated with the task.
 - Known problems / TODO:
-  - None. Ready for Stage F9 (CLI wiring, stats, Docker, docs).
+  - None. Ready for Stage F10 (Eval harness in Python).
 - Next stage:
-  - Stage F9: CLI wiring, stats, Docker, docs.
+  - Stage F10: Eval harness (`evals/flow_run.py`, `flow_metrics.py`, `flow_report.py`, `flow_profile.py`, etc.).
+
 
 
 

@@ -74,9 +74,8 @@ pub fn reset_tasks_for_resume(state: &mut RunState) {
 
 pub async fn run_resume(args: &ResumeArgs) -> anyhow::Result<()> {
     let start_time = Instant::now();
-    let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-    let repo_path = std::fs::canonicalize(&cwd)
-        .map_err(|e| anyhow::anyhow!("failed to resolve repo path: {e}"))?;
+    let repo_path = std::fs::canonicalize(&args.repo)
+        .map_err(|e| anyhow::anyhow!("failed to resolve repo path '{}': {e}", args.repo))?;
 
     let run_dir = repo_path.join(".arqus").join("flow").join(&args.run_id);
     let state_path = run_dir.join("state.json");
@@ -177,6 +176,20 @@ pub async fn run_resume(args: &ResumeArgs) -> anyhow::Result<()> {
         json!({ "status": if success { "finished" } else { "failed" } }),
     );
 
+    let default_worker_model = config
+        .workers
+        .iter()
+        .find(|w| w.name == config.routing.default_worker)
+        .or_else(|| config.workers.first())
+        .map(|w| w.model.as_str())
+        .unwrap_or("worker");
+    let _ = crate::flow::engine::stats::record_run_stats(
+        &run_state,
+        &ledger,
+        default_worker_model,
+        &config.orchestrator.model,
+    );
+
     let totals = ledger.totals();
     let elapsed = start_time.elapsed().as_secs();
     let mut done_count = 0;
@@ -218,4 +231,3 @@ pub async fn run_resume(args: &ResumeArgs) -> anyhow::Result<()> {
 #[cfg(test)]
 #[path = "resume_tests.rs"]
 mod tests;
-
