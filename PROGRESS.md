@@ -1774,5 +1774,27 @@
 - Next stage:
   - Stage F8a: State, scheduler, router (`engine/state.rs`, `scheduler.rs`, `router.rs`).
 
+## Stage F8a: State, scheduler, router   [DONE]
+- Files created or changed:
+  - `src/flow/mod.rs`: declared `pub mod engine;`.
+  - `src/flow/engine/mod.rs`: declared `pub mod router;`, `pub mod scheduler;`, `pub mod state;`.
+  - `src/flow/engine/router.rs`, `src/flow/engine/router_tests.rs`: defined `WorkerProfile` type alias, `Router` trait with `select(&TaskContract) -> &WorkerConfig`, and `DefaultRouter` with `from_config` that selects default worker and ignores `by_category`.
+  - `src/flow/engine/scheduler.rs`, `src/flow/engine/scheduler_tests.rs`: implemented `Scheduler` / `next_ready` returning lowest task ID among ready tasks with all dependencies done, plus `is_finished` and `all_done` helpers.
+  - `src/flow/engine/state.rs`, `src/flow/engine/state_tests.rs`, `src/flow/engine/state_split_tests.rs`: implemented `check_transition` (validating the 9 allowed transitions against the 64-pair matrix and returning `FlowError::InvalidTransition` for all other pairs), `TaskState::transition`, `RunState::from_plan`, `RunState::transition_task`, fixed-point `update_dependents` (cascading `Pending -> Ready` when all deps are Done, and `Pending -> Skipped` transitively when any dep is Failed or Skipped), `replace_with_subtasks` (superseding old task, `<old>.N` IDs, inheriting old dependencies, incrementing `split_depth`, and rewiring downstream dependents to leaf subtasks), and atomic persistence (`save` via `crate::atomic_write::write_atomic`, and `load`).
+- What works (command + short real output):
+  - `cargo test --bin arqus flow::engine` -> `test result: ok. 25 passed; 0 failed; 0 ignored; finished in 0.01s`
+  - `cargo test --bin arqus flow` -> `test result: ok. 190 passed; 0 failed; 0 ignored; finished in 1.03s`
+  - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
+  - `./scripts/test-audit-flow.sh` -> `Tests passed: 30, failed: 0. All audit-flow tests passed!`
+  - `./scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - In `replace_with_subtasks`, leaf subtasks are defined as subtasks in the split that no other sibling subtask in the split depends on; downstream tasks depending on the old task are rewired to depend on all leaf subtasks.
+  - In `update_dependents`, a fixed-point loop iterates until no more status changes occur, properly propagating transitive skips and readiness down arbitrary dependency trees.
+- Known problems / TODO:
+  - None. Ready for Stage F8b (Execution loop in `engine/run_loop.rs`).
+- Next stage:
+  - Stage F8b: Execution loop (`engine/run_loop.rs`).
+
+
 
 
