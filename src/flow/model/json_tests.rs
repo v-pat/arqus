@@ -116,4 +116,3 @@ fn serde_error_becomes_repair_message_listing_type_mismatch_path() {
         other => panic!("expected ParseError, got {other:?}"),
     }
 }
-

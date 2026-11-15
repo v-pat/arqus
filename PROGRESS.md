@@ -1648,6 +1648,34 @@
 - Next stage:
   - Stage F3: Git, sandbox, verification (`repo/git.rs`, `exec/sandbox.rs`, `exec/verify.rs`).
 
+## Stage F3: Git, sandbox, verification   [DONE]
+- Files created or changed:
+  - `src/atomic_write.rs`, `src/atomic_write_tests.rs`: pure extraction of `write_atomic` with temporary file creation, permissions preservation, and atomic rename.
+  - `src/tools/write.rs`: delegated atomic writing to `crate::atomic_write::write_atomic`.
+  - `src/process_group.rs`, `src/process_group_tests.rs`: pure extraction of `configure_process_group`, `kill_process_group`, and `GroupGuard`.
+  - `src/tools/bash.rs`, `src/mcp/transport.rs`: replaced private group killing with `crate::process_group`.
+  - `src/flow/repo/mod.rs`: declared `pub mod git;`.
+  - `src/flow/repo/git.rs`, `src/flow/repo/git_tests.rs`: git repository management (`check_clean_repo` rejecting modified/untracked files, `ensure_exclude_entry` updating `.git/info/exclude` without touching `.gitignore`, `create_branch_and_worktree` for `arqus/flow/<run_id>`, `get_head_commit`, `reset_hard_clean`, and `commit_changes` with user `arqus-flow <flow@localhost>`).
+  - `src/flow/exec/mod.rs`: declared `pub mod sandbox;` and `pub mod verify;`.
+  - `src/flow/exec/sandbox.rs`, `src/flow/exec/sandbox_tests.rs`: sandbox execution (`check_command_allowed` enforcing exact leading-token allowlist matching and checking `safety::is_risky`, and `run_command` with `env_clear()`, passthrough env keys, process group timeout kill, and 4,000 char tail truncation).
+  - `src/flow/exec/verify.rs`, `src/flow/exec/verify_tests.rs`: scope checking (`check_scope` enforcing modified/added/deleted/renamed paths subset of `allowed_writes`, rejecting external paths, and enforcing `max_changed_lines_hard`), and `run_verify_commands` running verify commands with fail-fast semantics.
+  - `src/flow/mod.rs`: declared `pub mod exec;` and `pub mod repo;`.
+  - `src/main.rs`: declared `mod atomic_write;` and `mod process_group;`.
+- What works (command + short real output):
+  - `cargo test --bin arqus flow` -> `test result: ok. 71 passed; 0 failed; finished in 1.02s`
+  - `cargo test --bin arqus atomic_write process_group` -> `test result: ok. 5 passed; 0 failed`
+  - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
+  - `./scripts/test-audit-flow.sh` -> `Tests passed: 30, failed: 0. All audit-flow tests passed!`
+  - `./scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - In `exec/verify.rs`, untracked files in the worktree that are within `allowed_writes` have their line count added to the numstat diff count against HEAD to ensure accurate total changed line count enforcement against `max_changed_lines_hard`.
+  - In `exec/sandbox.rs`, command output truncation keeps the tail of up to 4,000 characters for stdout and stderr without injecting artificial headers so raw command outputs remain intact for tests and verify checks.
+- Known problems / TODO:
+  - None. Ready for Stage F4 (Edit format).
+- Next stage:
+  - Stage F4: Edit format (`exec/edits.rs`, SEARCH/REPLACE and FILE block parsing and atomic apply).
+
+
 
 
 

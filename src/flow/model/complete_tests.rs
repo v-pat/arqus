@@ -143,4 +143,3 @@ async fn fallback_estimates_tokens_when_provider_reports_no_usage() {
     assert_eq!(res.usage.output, 2);
     assert!(res.usage.input > 0);
 }
-

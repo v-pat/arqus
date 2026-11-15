@@ -135,4 +135,3 @@ fn ledger_totals_splits_cloud_and_local() {
     assert_eq!(totals.total.input, 750);
     assert_eq!(totals.total.output, 150);
 }
-
