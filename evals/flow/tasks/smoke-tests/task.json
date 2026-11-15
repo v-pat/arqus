@@ -1,0 +1,14 @@
+{
+  "name": "smoke-tests",
+  "language": "python",
+  "size": "S",
+  "category": "tests",
+  "repo": "setup",
+  "objective": "Write unit tests for clamp() in test_clamp.py",
+  "public_verify": ["python3 test_pub.py"],
+  "hidden_verify": ["python3 test_hid.py"],
+  "regression_verify": ["python3 test_reg.py"],
+  "protected": ["test_reg.py"],
+  "reference_patch": "reference.patch"
+}
+

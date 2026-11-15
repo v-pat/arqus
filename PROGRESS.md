@@ -1849,6 +1849,35 @@
 - Next stage:
   - Stage F10: Eval harness (`evals/flow_run.py`, `flow_metrics.py`, `flow_report.py`, `flow_profile.py`, etc.).
 
+## Stage F10: Eval harness (Python, standard library only)   [DONE]
+- Files created or changed:
+  - `evals/flow_task.py`: implemented task schema (`TaskDefinition`, `PlannerTask`, `NanoTask`), loaders for e2e, planner, and nano tasks, and directory scanner.
+  - `evals/flow_validity.py`: implemented `validate_task` enforcing the 4 rules from document 6 (clean repo check, `hidden_verify` failing before reference patch and passing after, `regression_verify` passing before and after, `public_verify` failing before reference patch).
+  - `evals/flow_metrics.py`: implemented all evaluation metrics from document 6 B6 (accuracy metrics, cloud token and dollar accounting, paired token savings with median and aggregate, delegation metrics, overhead metrics, contract quality metrics, stability metrics, paired table, and exact two-tailed sign test on discordant tasks).
+  - `evals/flow_profile.py`: implemented `build_profile_stats` and `generate_profile_file` extracting category pass rates from `stats.jsonl` (filtering categories with n >= 5 only) and producing `profile_stats.json` for worker capability sheets.
+  - `evals/flow_report.py`: implemented markdown report generation (`FLOW_REPORT.md`) with pins, paired table, condition comparison, category and language breakdowns, B9 failure causes tally, B8 decision table evaluator, and `flow_results.jsonl` append.
+  - `evals/flow_run.py`: implemented multi-condition runner (D0, H1 to H5) with repeats, interleaving across tasks and conditions, isolated temporary git repositories, hidden test file copying post-model execution, and verification.
+  - `evals/flow/tasks/`: created 6 smoke fixtures proving the eval machinery (`smoke-single-function`, `smoke-bugfix`, `smoke-tests`, `smoke-boilerplate`, `smoke-refactor`, `smoke-multifile`), each with setup git repository, verification scripts, and reference patch.
+  - `evals/tests/`: added complete test suite with 42 unit tests (`test_flow_metrics.py`, `test_task_validity.py`, `test_task_loaders.py`, `test_flow_profile.py`, `test_flow_report.py`, `test_flow_run_smoke.py`).
+  - `scripts/run-flow-evals.sh`, `scripts/build-flow-profile.sh`: added execution shell scripts.
+  - `scripts/check.sh`: wired python unit test discovery (`python3 -m unittest discover -s evals/tests -p "test_*.py"`) when `python3` is available.
+  - `.gitignore`: added bytecode caches and `flow_results.jsonl`.
+- What works (command + short real output):
+  - `python3 -m unittest discover -s evals/tests -p "test_*.py"` -> `Ran 42 tests in 1.991s; OK`
+  - `cargo test --bin arqus flow` -> `test result: ok. 225 passed; 0 failed; 0 ignored; finished in 1.02s`
+  - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
+  - `./scripts/test-audit-flow.sh` -> `Tests passed: 30, failed: 0. All audit-flow tests passed!`
+  - `./scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - In `flow_metrics.py`, exact sign test on discordant tasks uses two-tailed cumulative binomial probability with parameter p = 0.5 under the null hypothesis.
+  - In `flow_profile.py`, only categories with sample size n >= 5 are included in the generated `profile_stats.json`, matching the capability sheet requirement.
+  - Smoke fixtures use minimal Python and shell verifiers so that eval machinery verification is self-contained and fast without requiring external toolchains.
+- Known problems / TODO:
+  - None. Ready for Stage F11 (Live shakedown and first eval).
+- Next stage:
+  - Stage F11: Live shakedown and first eval.
+
+
 
 
 

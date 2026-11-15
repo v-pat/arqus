@@ -241,4 +241,3 @@ fn test_build_task_stats_tokens_summed_from_ledger() {
     assert_eq!(stats.len(), 1);
     assert_eq!(stats[0].tokens, 450);
 }
-

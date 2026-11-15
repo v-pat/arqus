@@ -27,4 +27,9 @@ echo "==> audit flow"
 ./scripts/audit-flow.sh
 ./scripts/test-audit-flow.sh
 
+if command -v python3 >/dev/null 2>&1; then
+    echo "==> evals python unit tests"
+    python3 -m unittest discover -s evals/tests -p "test_*.py"
+fi
+
 echo "all checks passed"

@@ -1,0 +1,14 @@
+{
+  "name": "smoke-boilerplate",
+  "language": "python",
+  "size": "S",
+  "category": "boilerplate",
+  "repo": "setup",
+  "objective": "Generate boilerplate dataclass Config in config.py",
+  "public_verify": ["python3 test_pub.py"],
+  "hidden_verify": ["python3 test_hid.py"],
+  "regression_verify": ["python3 test_reg.py"],
+  "protected": ["test_*.py"],
+  "reference_patch": "reference.patch"
+}
+

@@ -1,0 +1,14 @@
+{
+  "name": "smoke-multifile",
+  "language": "python",
+  "size": "M",
+  "category": "multi_file",
+  "repo": "setup",
+  "objective": "Implement user authentication in auth.py using models.py and database.py",
+  "public_verify": ["python3 test_pub.py"],
+  "hidden_verify": ["python3 test_hid.py"],
+  "regression_verify": ["python3 test_reg.py"],
+  "protected": ["test_*.py"],
+  "reference_patch": "reference.patch"
+}
+

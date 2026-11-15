@@ -1,0 +1,14 @@
+{
+  "name": "smoke-bugfix",
+  "language": "python",
+  "size": "S",
+  "category": "local_bugfix",
+  "repo": "setup",
+  "objective": "Fix division by zero bug in average() in stats.py",
+  "public_verify": ["python3 test_pub.py"],
+  "hidden_verify": ["python3 test_hid.py"],
+  "regression_verify": ["python3 test_reg.py"],
+  "protected": ["test_*.py"],
+  "reference_patch": "reference.patch"
+}
+

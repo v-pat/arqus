@@ -1,0 +1,22 @@
+diff --git a/converter.py b/converter.py
+index 9fecfcc..3994d52 100644
+--- a/converter.py
++++ b/converter.py
+@@ -1,6 +1,17 @@
++from dataclasses import dataclass
++
++@dataclass
++class ConversionResult:
++    value: float
++    unit: str
++
+ def to_celsius(f: float) -> float:
+     return (f - 32.0) * 5.0 / 9.0
+ 
+ def to_fahrenheit(c: float) -> float:
+     return (c * 9.0 / 5.0) + 32.0
+ 
++def convert_temp(val: float, unit: str) -> ConversionResult:
++    if unit.upper() == 'C':
++        return ConversionResult(to_fahrenheit(val), 'F')
++    return ConversionResult(to_celsius(val), 'C')

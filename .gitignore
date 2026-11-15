@@ -1,5 +1,8 @@
 /target
 /evals/results.jsonl
+/evals/flow_results.jsonl
+__pycache__/
+*.pyc
 /test-run
 /.serena
 .DS_Store

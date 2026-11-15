@@ -1,0 +1,14 @@
+{
+  "name": "smoke-refactor",
+  "language": "python",
+  "size": "M",
+  "category": "local_refactor",
+  "repo": "setup",
+  "objective": "Refactor temperature conversion in converter.py to use a ConversionResult class",
+  "public_verify": ["python3 test_pub.py"],
+  "hidden_verify": ["python3 test_hid.py"],
+  "regression_verify": ["python3 test_reg.py"],
+  "protected": ["test_*.py"],
+  "reference_patch": "reference.patch"
+}
+

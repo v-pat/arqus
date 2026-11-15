@@ -1,0 +1,10 @@
+--- /dev/null
++++ b/config.py
+@@ -0,0 +1,6 @@
++from dataclasses import dataclass
++
++@dataclass
++class Config:
++    host: str
++    port: int
+

@@ -1,0 +1,14 @@
+{
+  "name": "smoke-single-function",
+  "language": "python",
+  "size": "S",
+  "category": "single_function",
+  "repo": "setup",
+  "objective": "Implement is_palindrome(text) in string_utils.py",
+  "public_verify": ["python3 test_pub.py"],
+  "hidden_verify": ["python3 test_hid.py"],
+  "regression_verify": ["python3 test_reg.py"],
+  "protected": ["test_*.py"],
+  "reference_patch": "reference.patch"
+}
+

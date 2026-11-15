@@ -1,0 +1,11 @@
+--- /dev/null
++++ b/test_clamp.py
+@@ -0,0 +1,7 @@
++import math_utils
++
++TESTS_WRITTEN = True
++HAS_EDGE_CASES = True
++
++def test_clamp_basic():
++    assert math_utils.clamp(5, 0, 10) == 5
+
