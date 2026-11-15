@@ -146,4 +146,3 @@ fn test_repo_map_stable_output_byte_deterministic() {
         "files must be lexicographically sorted"
     );
 }
-

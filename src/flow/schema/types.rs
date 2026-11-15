@@ -183,6 +183,21 @@ pub enum IssueCode {
     AcceptanceCriteriaTooMany,
     InterfaceNotesTooLong,
     InvalidLineRange,
+    DuplicateId,
+    TooManyTasks,
+    MissingDependency,
+    CycleDetected,
+    MissingContextPath,
+    EmptyAllowedWrites,
+    InvalidAllowedWritePath,
+    ProtectedPath,
+    UnorderedOverlappingWrites,
+    WorkerExceededContextFiles,
+    WorkerExceededWriteFiles,
+    WorkerExceededChangedLines,
+    WorkerPromptBudgetExceeded,
+    NonAllowlistedVerify,
+    MissingVerifyCommand,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]

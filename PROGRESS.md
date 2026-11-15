@@ -1721,3 +1721,31 @@
 - Next stage:
   - Stage F6: Validator, capability sheet, planner (`planning/validator.rs`, `capability.rs`, `prompts.rs`, `planner.rs`, and `arqus flow run --dry-plan`).
 
+## Stage F6: Validator, capability sheet, planner   [DONE]
+- Files created or changed:
+  - `src/flow/mod.rs`: declared `pub mod planning;`.
+  - `src/flow/schema/types.rs`: added `IssueCode` variants for Section 7 rules.
+  - `src/flow/planning/mod.rs`: declared submodules `validator`, `validator_graph`, `capability`, `prompts`, `planner`.
+  - `src/flow/planning/validator.rs`, `validator_tests.rs`, `validator_rules_tests.rs`: pure function `validate_plan` implementing rules 1-8 of Section 7.
+  - `src/flow/planning/validator_graph.rs`, `validator_graph_tests.rs`: helper functions for transitive dependency analysis, Kahn's algorithm cycle detection, and protected path pattern matching.
+  - `src/flow/planning/capability.rs`, `capability_tests.rs`: capability sheet rendering from worker configuration and optional `profile_stats.json` (categories with n >= 5).
+  - `src/flow/planning/prompts.rs`, `prompts_tests.rs`: `PROMPT_VERSION = "v1"`, system prompt builder, repo map and objective user messages, issue repair message formatting, and 60 KB file content truncation.
+  - `src/flow/planning/planner.rs`, `planner_tests.rs`, `planner_repair_tests.rs`: `Planner` loop supporting need-files rounds, max file read round forcing, JSON repair, validation issue repair, ledger accounting, and `FlowError::PlanningFailed`.
+  - `src/flow/cli.rs`, `src/flow/cli_tests.rs`: wired `--dry-plan` to run planning, validation, print plan summary, tasks, final verify commands, and token totals, touching nothing.
+  - `tests/e2e_flow_dry_plan.rs`: end-to-end black-box test verifying `--dry-plan` CLI execution against a mock server.
+- What works (command + short real output):
+  - `cargo test --bin arqus flow::planning` -> `test result: ok. 33 passed; 0 failed; 0 ignored; finished in 0.01s`
+  - `cargo test --test e2e_flow_dry_plan` -> `test result: ok. 1 passed; 0 failed; 0 ignored; finished in 0.13s`
+  - `cargo test --bin arqus flow` -> `test result: ok. 144 passed; 0 failed; 0 ignored; finished in 1.03s`
+  - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
+  - `./scripts/test-audit-flow.sh` -> `Tests passed: 30, failed: 0. All audit-flow tests passed!`
+  - `./scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - Protected pattern `dir/**` matches paths starting with `dir/` or exactly equal to `dir`.
+  - In need-files rounds, requested files exceeding 60 KB (61,440 bytes) are cleanly truncated with `\n[... truncated at 60 KB ...]`.
+- Known problems / TODO:
+  - None. Ready for Stage F7 (Worker, takeover, redesign).
+- Next stage:
+  - Stage F7: Worker, takeover, redesign (`exec/worker.rs`, `exec/takeover.rs`, `planning/redesign.rs`).
+
+

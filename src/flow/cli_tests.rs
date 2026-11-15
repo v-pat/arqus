@@ -51,3 +51,17 @@ fn test_existing_cli_without_subcommand_unchanged() {
     assert!(cli.continue_last);
     assert!(cli.command.is_none());
 }
+
+#[test]
+fn test_dry_plan_flag_parsed() {
+    let cli = Cli::try_parse_from(["arqus", "flow", "run", "do task", "--dry-plan"]).unwrap();
+    if let Some(Command::Flow(FlowArgs {
+        command: FlowCommand::Run(args),
+    })) = cli.command
+    {
+        assert!(args.dry_plan);
+        assert_eq!(args.objective, "do task");
+    } else {
+        panic!("expected Run with dry_plan");
+    }
+}

@@ -62,9 +62,13 @@ pub struct ReportArgs {
 
 pub async fn run(args: &FlowArgs) -> anyhow::Result<()> {
     match &args.command {
-        FlowCommand::Run(_run_args) => {
-            println!("arqus flow run");
-            Ok(())
+        FlowCommand::Run(run_args) => {
+            if run_args.dry_plan {
+                run_dry_plan(run_args).await
+            } else {
+                println!("arqus flow run");
+                Ok(())
+            }
         }
         FlowCommand::Resume(_resume_args) => {
             println!("arqus flow resume");
@@ -76,6 +80,102 @@ pub async fn run(args: &FlowArgs) -> anyhow::Result<()> {
         }
         FlowCommand::ModelsCheck => models_check().await,
     }
+}
+
+async fn run_dry_plan(run_args: &RunArgs) -> anyhow::Result<()> {
+    let repo_path = std::fs::canonicalize(&run_args.repo)
+        .map_err(|e| anyhow::anyhow!("failed to resolve repo path '{}': {e}", run_args.repo))?;
+    let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    let overrides = crate::flow::config::types::FlowCliOverrides {
+        orchestrator_model: run_args.orchestrator_model.clone(),
+        worker: run_args.worker.clone(),
+        max_cost: run_args.max_cost,
+        max_cloud_tokens: run_args.max_cloud_tokens,
+    };
+    let config = crate::flow::config::load_flow_config(&home, &repo_path, &overrides)
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    let base_files = crate::flow::repo::git::list_tracked_files(&repo_path)
+        .map_err(|e| anyhow::anyhow!("git error: {e}"))?;
+
+    let repo_map = crate::flow::repo::map::build_repo_map(&repo_path, 32 * 1024)
+        .map_err(|e| anyhow::anyhow!("failed to build repo map: {e}"))?;
+
+    let default_worker = config
+        .workers
+        .iter()
+        .find(|w| w.name == config.routing.default_worker)
+        .or_else(|| config.workers.first())
+        .ok_or_else(|| anyhow::anyhow!("no worker configured"))?;
+
+    let profile_stats_path = home.join(".arqus/flow/profile_stats.json");
+    let stats_opt = if profile_stats_path.exists() {
+        Some(profile_stats_path.as_path())
+    } else {
+        None
+    };
+    let capability_sheet =
+        crate::flow::planning::capability::render_capability_sheet(default_worker, stats_opt);
+
+    let orch_cfg = crate::ai::ModelConfig {
+        provider: config.orchestrator.provider.clone(),
+        model: config.orchestrator.model.clone(),
+        base_url: config.orchestrator.base_url.clone(),
+        api_key: config.orchestrator_key.clone(),
+        context_window: crate::ai::default_context_window(&config.orchestrator.provider),
+        extra_body: config.orchestrator.extra_body.clone(),
+    };
+    let llm = crate::ai::Llm::from_config(orch_cfg);
+    let mut ledger = crate::flow::model::ledger::Ledger::new(None);
+    let run_id = uuid::Uuid::new_v4().to_string();
+
+    let mut planner = crate::flow::planning::planner::Planner {
+        llm: &llm,
+        config: &config,
+        repo_path: &repo_path,
+        base_files: &base_files,
+        repo_map: &repo_map,
+        capability_sheet: &capability_sheet,
+        ledger: &mut ledger,
+        run_id: &run_id,
+    };
+
+    let plan = planner
+        .plan(&run_args.objective)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    println!("Plan: {}", plan.summary);
+    println!("Tasks ({}):", plan.tasks.len());
+    for t in &plan.tasks {
+        println!(
+            "  [{}] {} ({:?}, {:?})",
+            t.id, t.title, t.assignee, t.category
+        );
+        println!("      objective: {}", t.objective);
+        println!("      allowed_writes: {}", t.allowed_writes.join(", "));
+        if !t.verify.is_empty() {
+            println!("      verify: {}", t.verify.join("; "));
+        }
+    }
+    if !plan.final_verify.is_empty() {
+        println!("Final verify: {}", plan.final_verify.join("; "));
+    }
+    let totals = ledger.totals();
+    let cost_str = totals
+        .cloud
+        .cost_usd
+        .map(|c| format!("${:.4}", c))
+        .unwrap_or_else(|| "$0.0000".to_string());
+    println!(
+        "[arqus flow dry-plan] tasks={} cloud_in={} cloud_out={} cost={}",
+        plan.tasks.len(),
+        totals.cloud.input,
+        totals.cloud.output,
+        cost_str,
+    );
+
+    Ok(())
 }
 
 async fn models_check() -> anyhow::Result<()> {
