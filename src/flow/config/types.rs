@@ -26,6 +26,8 @@ pub struct OrchestratorConfig {
     pub max_output_tokens: Option<u32>,
     #[serde(default)]
     pub price: Option<PriceConfig>,
+    #[serde(default)]
+    pub extra_body: Option<Value>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -152,6 +154,9 @@ pub fn overlay_settings(base: &mut FlowSettings, other: FlowSettings) {
                 }
                 if other_orch.price.is_some() {
                     orch.price = other_orch.price;
+                }
+                if other_orch.extra_body.is_some() {
+                    orch.extra_body = other_orch.extra_body;
                 }
             }
             None => base.orchestrator = Some(other_orch),

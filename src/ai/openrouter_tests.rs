@@ -9,6 +9,7 @@ fn cfg() -> ModelConfig {
         base_url: DEFAULT_BASE_URL.to_string(),
         api_key: "test".to_string(),
         context_window: 128_000,
+        extra_body: None,
     }
 }
 

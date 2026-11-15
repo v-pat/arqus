@@ -76,6 +76,13 @@ pub fn build_body(cfg: &ModelConfig, req: &LlmRequest) -> Value {
     if let Some(max_tokens) = req.max_tokens {
         body["max_tokens"] = json!(max_tokens);
     }
+    if let Some(Value::Object(map)) = &cfg.extra_body {
+        for (k, v) in map {
+            if k != "model" && k != "messages" {
+                body[k] = v.clone();
+            }
+        }
+    }
     body
 }
 
@@ -198,126 +205,5 @@ pub async fn stream_with_headers(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::types::{StopReason, Usage};
-
-    fn cfg() -> ModelConfig {
-        ModelConfig {
-            provider: "openai".to_string(),
-            model: "some-model".to_string(),
-            base_url: "http://localhost:1234/v1".to_string(),
-            api_key: "test".to_string(),
-            context_window: 128_000,
-        }
-    }
-
-    #[test]
-    fn converts_every_message_kind() {
-        let messages = vec![
-            Message::User {
-                text: "list the files".to_string(),
-            },
-            Message::Assistant {
-                blocks: vec![
-                    Block::Text {
-                        text: "Checking.".to_string(),
-                    },
-                    Block::Thinking {
-                        text: "think".to_string(),
-                    },
-                    Block::ToolCall {
-                        id: "call_1".to_string(),
-                        name: "bash".to_string(),
-                        args: json!({"command": "ls"}),
-                    },
-                ],
-                provider: "openai".to_string(),
-                model: "m".to_string(),
-                usage: Some(Usage::default()),
-                stop: StopReason::ToolUse,
-            },
-            Message::ToolResult {
-                call_id: "call_1".to_string(),
-                tool_name: "bash".to_string(),
-                text: "Cargo.toml\nsrc".to_string(),
-                is_error: false,
-            },
-        ];
-        let got = Value::Array(convert_messages("be short", &messages));
-        let expected = json!([
-            {"role": "system", "content": "be short"},
-            {"role": "user", "content": "list the files"},
-            {
-                "role": "assistant",
-                "content": "Checking.",
-                "reasoning_content": "think",
-                "tool_calls": [{
-                    "id": "call_1",
-                    "type": "function",
-                    "function": {"name": "bash", "arguments": "{\"command\":\"ls\"}"}
-                }]
-            },
-            {"role": "tool", "tool_call_id": "call_1", "content": "Cargo.toml\nsrc"},
-        ]);
-        assert_eq!(got, expected);
-    }
-
-    #[test]
-    fn assistant_without_tool_calls_has_no_tool_calls_field() {
-        let messages = vec![Message::Assistant {
-            blocks: vec![Block::Text {
-                text: "done".to_string(),
-            }],
-            provider: "openai".to_string(),
-            model: "m".to_string(),
-            usage: None,
-            stop: StopReason::Stop,
-        }];
-        let got = convert_messages("s", &messages);
-        assert_eq!(got[1], json!({"role": "assistant", "content": "done"}));
-    }
-
-    #[test]
-    fn body_has_tools_only_when_present() {
-        let tool = ToolDef {
-            name: "read".to_string(),
-            description: "read a file".to_string(),
-            parameters: json!({"type": "object"}),
-        };
-        let base = LlmRequest {
-            system: "s".to_string(),
-            messages: vec![],
-            tools: vec![],
-            max_tokens: None,
-        };
-
-        let plain = build_body(&cfg(), &base);
-        assert_eq!(plain["model"], "some-model");
-        assert_eq!(plain["stream"], true);
-        assert_eq!(plain["stream_options"]["include_usage"], true);
-        assert!(plain.get("tools").is_none());
-        assert!(plain.get("max_tokens").is_none());
-
-        let full = build_body(
-            &cfg(),
-            &LlmRequest {
-                tools: vec![tool],
-                max_tokens: Some(99),
-                ..base
-            },
-        );
-        assert_eq!(
-            full["tools"],
-            json!([{
-                "type": "function",
-                "function": {
-                    "name": "read",
-                    "description": "read a file",
-                    "parameters": {"type": "object"}
-                }
-            }])
-        );
-        assert_eq!(full["max_tokens"], 99);
-    }
-}
+#[path = "openai_tests.rs"]
+mod tests;

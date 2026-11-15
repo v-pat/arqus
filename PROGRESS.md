@@ -1621,5 +1621,33 @@
 - Next stage:
   - Stage F2: Model layer (`model/complete.rs`, `model/json.rs`, `model/ledger.rs`, adapter `extra_body`).
 
+## Stage F2: Model layer   [DONE]
+- Files created or changed:
+  - `src/flow/model/mod.rs`: exported `complete`, `json`, `ledger`.
+  - `src/flow/model/complete.rs`, `src/flow/model/complete_tests.rs`: `complete_text` consuming LLM streams into `Completion` (text, provider usage, cache read/write, latency, and chars/4 fallback estimation) using sequential single-task `tokio::select!` without `tokio::spawn`, `join!`, or threads.
+  - `src/flow/model/json.rs`, `src/flow/model/json_tests.rs`: think tag stripping (balanced and unterminated), robust markdown fence/prose/balanced object JSON extraction, object vs array enforcement, and schema repair message generation preserving failing field paths.
+  - `src/flow/model/ledger.rs`, `src/flow/model/ledger_tests.rs`: `Role` (Planner, Redesign, Takeover, Worker), `UsageRecord` serialization to `usage.jsonl`, cost calculation (reported cost priority, price table with cached input rate fallback, or null), and `Ledger` role/cloud/local totals aggregation.
+  - `src/ai/openai.rs`, `src/ai/openai_tests.rs`: additive `extra_body` shallow merging into the OpenAI-compatible request body (preventing override of `model` and `messages`), with inline tests purely extracted to `openai_tests.rs` keeping `openai.rs` well under 300 lines.
+  - `src/ai/mod.rs`: added `extra_body` field and `with_extra_body` builder to `ModelConfig`.
+  - `src/flow/config/types.rs`: added `extra_body` support to `OrchestratorConfig` and updated `overlay_settings`.
+  - `src/flow/cli.rs`: wired `FlowCommand::ModelsCheck` live smoke test runner.
+  - `tests/e2e_flow_model.rs`: integration test verifying `extra_body` wire delivery to mock server and `models-check` command execution.
+- What works (command + short real output):
+  - `cargo test --bin arqus flow` -> `test result: ok. 46 passed; 0 failed; finished in 0.01s`
+  - `cargo test --bin arqus openai` -> `test result: ok. 7 passed; 0 failed; finished in 0.00s`
+  - `cargo test --test e2e_flow_model` -> `test result: ok. 1 passed; 0 failed; finished in 1.04s`
+  - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
+  - `./scripts/test-audit-flow.sh` -> `Tests passed: 30, failed: 0. All audit-flow tests passed!`
+  - `./scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - In `model/complete.rs`, single-task sequential execution with `tokio::select!` between `&mut run` and `rx.recv()` ensures zero spawned background tasks or `join!` while preventing channel backpressure deadlocks.
+  - In `model/ledger.rs`, if `price.cached_input` is not explicitly set, the standard `price.input` rate is used as fallback.
+  - For `models-check`, a minimal test prompt (`ping`) with `max_tokens: 16` is sent to verify model responsiveness and record round-trip latency.
+- Known problems / TODO:
+  - None. Ready for Stage F3 (Git, sandbox, verification).
+- Next stage:
+  - Stage F3: Git, sandbox, verification (`repo/git.rs`, `exec/sandbox.rs`, `exec/verify.rs`).
+
+
 
 

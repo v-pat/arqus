@@ -164,6 +164,7 @@ fn build(
         base_url,
         api_key: key.unwrap_or_default(),
         context_window,
+        extra_body: None,
     })
 }
 

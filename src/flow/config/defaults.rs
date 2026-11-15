@@ -56,6 +56,7 @@ pub fn default_flow_settings() -> FlowSettings {
                 cached_input: Some(0.003),
                 output: 0.60,
             }),
+            extra_body: None,
         }),
         workers: Some(vec![WorkerConfig {
             name: "local-9b".to_string(),
@@ -133,4 +134,3 @@ pub fn default_flow_settings() -> FlowSettings {
         }),
     }
 }
-

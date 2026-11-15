@@ -8,6 +8,7 @@ fn config() -> ModelConfig {
         base_url: "http://x".to_string(),
         api_key: "sk-secret-value".to_string(),
         context_window: 128_000,
+        extra_body: None,
     }
 }
 

@@ -46,6 +46,8 @@ pub struct ModelConfig {
     pub base_url: String,
     pub api_key: String,
     pub context_window: u64,
+    #[serde(default)]
+    pub extra_body: Option<Value>,
 }
 
 impl ModelConfig {
@@ -63,7 +65,14 @@ impl ModelConfig {
             api_key: env_or("ARQUS_API_KEY", ""),
             context_window,
             provider,
+            extra_body: None,
         }
+    }
+
+    /// Set an optional extra JSON object to merge into the request body.
+    pub fn with_extra_body(mut self, extra: Option<Value>) -> Self {
+        self.extra_body = extra;
+        self
     }
 
     /// Parse `provider:model`, keeping the other settings from the environment.
@@ -126,6 +135,7 @@ impl fmt::Debug for ModelConfig {
             .field("base_url", &self.base_url)
             .field("api_key", &"<redacted>")
             .field("context_window", &self.context_window)
+            .field("extra_body", &self.extra_body)
             .finish()
     }
 }

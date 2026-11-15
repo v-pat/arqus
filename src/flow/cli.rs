@@ -60,13 +60,113 @@ pub struct ReportArgs {
     pub run_id: String,
 }
 
-pub async fn run(_args: &FlowArgs) -> anyhow::Result<()> {
-    // Skeleton implementation for F1
-    println!("arqus flow skeleton");
+pub async fn run(args: &FlowArgs) -> anyhow::Result<()> {
+    match &args.command {
+        FlowCommand::Run(_run_args) => {
+            println!("arqus flow run");
+            Ok(())
+        }
+        FlowCommand::Resume(_resume_args) => {
+            println!("arqus flow resume");
+            Ok(())
+        }
+        FlowCommand::Report(_report_args) => {
+            println!("arqus flow report");
+            Ok(())
+        }
+        FlowCommand::ModelsCheck => models_check().await,
+    }
+}
+
+async fn models_check() -> anyhow::Result<()> {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    let overrides = crate::flow::config::FlowCliOverrides::default();
+    let config = crate::flow::config::load_flow_config(&home, &cwd, &overrides)
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    let mut failed = false;
+
+    let orch_cfg = crate::ai::ModelConfig {
+        provider: config.orchestrator.provider.clone(),
+        model: config.orchestrator.model.clone(),
+        base_url: config.orchestrator.base_url.clone(),
+        api_key: config.orchestrator_key.clone(),
+        context_window: crate::ai::default_context_window(&config.orchestrator.provider),
+        extra_body: config.orchestrator.extra_body.clone(),
+    };
+    let orch_llm = crate::ai::Llm::from_config(orch_cfg.clone());
+    let ping_req = crate::ai::LlmRequest {
+        system: "You are a test helper.".to_string(),
+        messages: vec![crate::types::Message::User {
+            text: "ping".to_string(),
+        }],
+        tools: vec![],
+        max_tokens: Some(16),
+    };
+
+    println!(
+        "Checking orchestrator {} ({}) at {}...",
+        orch_cfg.model, orch_cfg.provider, orch_cfg.base_url
+    );
+    match crate::flow::model::complete::complete_text(&orch_llm, ping_req.clone()).await {
+        Ok(res) => {
+            println!(
+                "[orchestrator] {}/{}: ok (latency: {}ms)",
+                orch_cfg.provider, orch_cfg.model, res.latency_ms
+            );
+        }
+        Err(err) => {
+            println!(
+                "[orchestrator] {}/{}: FAILED - {}",
+                orch_cfg.provider, orch_cfg.model, err
+            );
+            failed = true;
+        }
+    }
+
+    for worker in &config.workers {
+        let worker_key = config
+            .worker_keys
+            .get(&worker.name)
+            .cloned()
+            .unwrap_or_else(|| "local".to_string());
+        let worker_cfg = crate::ai::ModelConfig {
+            provider: worker.provider.clone(),
+            model: worker.model.clone(),
+            base_url: worker.base_url.clone(),
+            api_key: worker_key,
+            context_window: worker.max_prompt_tokens as u64,
+            extra_body: worker.extra_body.clone(),
+        };
+        let worker_llm = crate::ai::Llm::from_config(worker_cfg.clone());
+        println!(
+            "Checking worker '{}' {} ({}) at {}...",
+            worker.name, worker_cfg.model, worker_cfg.provider, worker_cfg.base_url
+        );
+        match crate::flow::model::complete::complete_text(&worker_llm, ping_req.clone()).await {
+            Ok(res) => {
+                println!(
+                    "[worker: {}] {}/{}: ok (latency: {}ms)",
+                    worker.name, worker_cfg.provider, worker_cfg.model, res.latency_ms
+                );
+            }
+            Err(err) => {
+                println!(
+                    "[worker: {}] {}/{}: FAILED - {}",
+                    worker.name, worker_cfg.provider, worker_cfg.model, err
+                );
+                failed = true;
+            }
+        }
+    }
+
+    if failed {
+        anyhow::bail!("one or more models failed check");
+    }
     Ok(())
 }
 
 #[cfg(test)]
 #[path = "cli_tests.rs"]
 mod tests;
-

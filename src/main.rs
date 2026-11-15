@@ -176,6 +176,7 @@ fn placeholder_model(provider: &str) -> ModelConfig {
         provider: provider.to_string(),
         model: String::new(),
         api_key: String::new(),
+        extra_body: None,
     }
 }
 

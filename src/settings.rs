@@ -258,6 +258,7 @@ impl EnvOverrides {
             base_url,
             api_key: self.api_key.clone().unwrap_or_default(),
             context_window,
+            extra_body: None,
         })
     }
 }

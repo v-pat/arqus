@@ -9,6 +9,7 @@ fn cfg() -> ModelConfig {
         base_url: "https://api.anthropic.com/v1".to_string(),
         api_key: "test".to_string(),
         context_window: 200_000,
+        extra_body: None,
     }
 }
 
