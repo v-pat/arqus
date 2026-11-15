@@ -84,12 +84,45 @@ pub enum FailureKind {
     BudgetExceeded,
 }
 
+impl std::fmt::Display for FailureKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoOutput => write!(f, "no_output"),
+            Self::Declined => write!(f, "declined"),
+            Self::ParseError => write!(f, "parse_error"),
+            Self::NoMatch => write!(f, "no_match"),
+            Self::AmbiguousMatch => write!(f, "ambiguous_match"),
+            Self::ScopeViolation => write!(f, "scope_violation"),
+            Self::VerifyFailed => write!(f, "verify_failed"),
+            Self::Timeout => write!(f, "timeout"),
+            Self::ProviderError => write!(f, "provider_error"),
+            Self::BudgetExceeded => write!(f, "budget_exceeded"),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct FailureRecord {
     pub kind: FailureKind,
     pub detail: String,
     pub attempt: u32,
     pub executor: Assignee,
+}
+
+impl FailureRecord {
+    pub fn new(
+        kind: FailureKind,
+        detail: impl Into<String>,
+        attempt: u32,
+        executor: Assignee,
+    ) -> Self {
+        Self {
+            kind,
+            detail: detail.into(),
+            attempt,
+            executor,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]

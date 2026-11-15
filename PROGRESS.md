@@ -1748,4 +1748,31 @@
 - Next stage:
   - Stage F7: Worker, takeover, redesign (`exec/worker.rs`, `exec/takeover.rs`, `planning/redesign.rs`).
 
+## Stage F7: Worker, takeover, redesign   [DONE]
+- Files created or changed:
+  - `src/flow/exec/mod.rs`: declared `pub mod takeover;` and `pub mod worker;`.
+  - `src/flow/planning/mod.rs`: declared `pub mod redesign;`.
+  - `src/flow/schema/types.rs`: added `Display` implementation for `FailureKind` and `FailureRecord::new` constructor.
+  - `src/flow/errors.rs`, `src/flow/errors_tests.rs`: added `to_failure_record(attempt, executor)` method on `FlowError`.
+  - `src/flow/planning/prompts.rs`, `src/flow/planning/prompts_tests.rs`: added prompt builders for worker, takeover, and redesign, plus safe UTF-8 character truncation helpers (`truncate_head`, `truncate_tail`).
+  - `src/flow/exec/worker.rs`, `src/flow/exec/worker_tests.rs`: implemented `run_worker_rounds` and `run_worker_attempt` supporting one-shot edit application, scope checking, verification commands, worktree reset on failure, and retry feedback loop with truncated previous output (3,000 chars) and failure kind/detail (2,000 chars tail).
+  - `src/flow/exec/takeover.rs`, `src/flow/exec/takeover_tests.rs`: implemented `run_takeover_rounds` routing execution to the orchestrator model with prior failure records (capped at 500 chars), retry feedback, and worktree reset.
+  - `src/flow/planning/redesign.rs`, `src/flow/planning/redesign_tests.rs`: implemented `redesign` sending the contract, worker capability sheet, and up to 2 failure records (capped at 1,500 chars) to orchestrator, parsing `RedesignDecision` (`Revise`, `Split`, `Takeover`) and defaulting any model error or unparseable output to `Takeover`.
+- What works (command + short real output):
+  - `cargo test --bin arqus flow::exec::worker` -> `test result: ok. 6 passed; 0 failed; 0 ignored; finished in 0.28s`
+  - `cargo test --bin arqus flow::exec::takeover` -> `test result: ok. 5 passed; 0 failed; 0 ignored; finished in 0.19s`
+  - `cargo test --bin arqus flow::planning::redesign` -> `test result: ok. 5 passed; 0 failed; 0 ignored; finished in 0.00s`
+  - `cargo test --bin arqus flow` -> `test result: ok. 165 passed; 0 failed; 0 ignored; finished in 1.02s`
+  - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
+  - `./scripts/test-audit-flow.sh` -> `Tests passed: 30, failed: 0. All audit-flow tests passed!`
+  - `./scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - In `takeover_rounds`, prior failures from worker attempts are included in the prompt (up to 3 records, details capped at 500 chars), and the executor is recorded as `Assignee::Orchestrator`.
+  - In `redesign`, any failure during the orchestrator call or failure to parse the response as a valid `RedesignDecision` JSON safely defaults to `RedesignDecision::Takeover`.
+- Known problems / TODO:
+  - None. Ready for Stage F8a (State, scheduler, router).
+- Next stage:
+  - Stage F8a: State, scheduler, router (`engine/state.rs`, `scheduler.rs`, `router.rs`).
+
+
 

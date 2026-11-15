@@ -29,3 +29,14 @@ fn test_flow_error_display() {
     let err = FlowError::Declined("out of scope".to_string());
     assert_eq!(err.to_string(), "task declined by model: out of scope");
 }
+
+#[test]
+fn test_flow_error_to_failure_record() {
+    use crate::flow::schema::types::{Assignee, FailureKind};
+    let err = FlowError::Declined("out of scope".to_string());
+    let record = err.to_failure_record(1, Assignee::Worker);
+    assert_eq!(record.kind, FailureKind::Declined);
+    assert_eq!(record.detail, "out of scope");
+    assert_eq!(record.attempt, 1);
+    assert_eq!(record.executor, Assignee::Worker);
+}

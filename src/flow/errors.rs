@@ -68,6 +68,33 @@ impl fmt::Display for FlowError {
 
 impl std::error::Error for FlowError {}
 
+impl FlowError {
+    pub fn to_failure_record(
+        &self,
+        attempt: u32,
+        executor: crate::flow::schema::types::Assignee,
+    ) -> crate::flow::schema::types::FailureRecord {
+        use crate::flow::schema::types::{FailureKind, FailureRecord};
+        let (kind, detail) = match self {
+            Self::NoOutput => (
+                FailureKind::NoOutput,
+                "model returned no output".to_string(),
+            ),
+            Self::Declined(r) => (FailureKind::Declined, r.clone()),
+            Self::ParseError(m) => (FailureKind::ParseError, m.clone()),
+            Self::NoMatch(m) => (FailureKind::NoMatch, m.clone()),
+            Self::AmbiguousMatch(m) => (FailureKind::AmbiguousMatch, m.clone()),
+            Self::ScopeViolation(m) => (FailureKind::ScopeViolation, m.clone()),
+            Self::VerificationFailed(m) => (FailureKind::VerifyFailed, m.clone()),
+            Self::Timeout(m) => (FailureKind::Timeout, m.clone()),
+            Self::ProviderError(m) => (FailureKind::ProviderError, m.clone()),
+            Self::BudgetExceeded(m) => (FailureKind::BudgetExceeded, m.clone()),
+            _ => (FailureKind::VerifyFailed, self.to_string()),
+        };
+        FailureRecord::new(kind, detail, attempt, executor)
+    }
+}
+
 #[cfg(test)]
 #[path = "errors_tests.rs"]
 mod tests;
