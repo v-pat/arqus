@@ -11,6 +11,7 @@ mod config;
 mod context;
 mod cost;
 mod debug;
+mod edit_match;
 mod flow;
 mod home;
 mod mcp;
