@@ -39,6 +39,12 @@ impl<'a> Planner<'a> {
         let mut repairs_count: u32 = 0;
 
         loop {
+            crate::flow::engine::budget::check_cloud_budget(
+                self.ledger,
+                &self.config.limits,
+                None,
+            )?;
+
             let req = LlmRequest {
                 system: system.clone(),
                 messages: messages.clone(),

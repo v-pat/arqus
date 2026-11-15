@@ -20,6 +20,7 @@ use crate::flow::repo::map::build_repo_map;
 use crate::flow::schema::types::{RunState, RunStatus};
 
 pub async fn run_flow(run_args: &RunArgs) -> anyhow::Result<()> {
+    let start_time = std::time::Instant::now();
     let repo_path = std::fs::canonicalize(&run_args.repo)
         .map_err(|e| anyhow::anyhow!("failed to resolve repo: {e}"))?;
     let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
@@ -29,13 +30,12 @@ pub async fn run_flow(run_args: &RunArgs) -> anyhow::Result<()> {
         max_cost: run_args.max_cost,
         max_cloud_tokens: run_args.max_cloud_tokens,
     };
-    let config =
-        load_flow_config(&home, &repo_path, &overrides).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let config = load_flow_config(&home, &repo_path, &overrides).map_err(anyhow::Error::new)?;
 
-    check_clean_repo(&repo_path).map_err(|e| anyhow::anyhow!("{e}"))?;
-    let base_commit = get_head_commit(&repo_path).map_err(|e| anyhow::anyhow!("{e}"))?;
-    let base_files = list_tracked_files(&repo_path).map_err(|e| anyhow::anyhow!("{e}"))?;
-    let repo_map = build_repo_map(&repo_path, 32_000).map_err(|e| anyhow::anyhow!("{e}"))?;
+    check_clean_repo(&repo_path).map_err(anyhow::Error::new)?;
+    let base_commit = get_head_commit(&repo_path).map_err(anyhow::Error::new)?;
+    let base_files = list_tracked_files(&repo_path).map_err(anyhow::Error::new)?;
+    let repo_map = build_repo_map(&repo_path, 32_000).map_err(anyhow::Error::new)?;
 
     let default_name = &config.routing.default_worker;
     let default_worker = config
@@ -165,10 +165,43 @@ pub async fn run_flow(run_args: &RunArgs) -> anyhow::Result<()> {
         json!({ "status": if success { "finished" } else { "failed" } }),
     );
 
+    let totals = ledger.totals();
+    let elapsed = start_time.elapsed().as_secs();
+    let mut done_count = 0;
+    let mut failed_count = 0;
+    for t in run_state.tasks.values() {
+        if t.status == crate::flow::schema::types::TaskStatus::Done {
+            done_count += 1;
+        } else if t.status == crate::flow::schema::types::TaskStatus::Failed {
+            failed_count += 1;
+        }
+    }
+    let cost_str = totals
+        .cloud
+        .cost_usd
+        .map(|c| format!("${:.4}", c))
+        .unwrap_or_else(|| "$0.0000".to_string());
+    eprintln!(
+        "[arqus flow] tasks={} done={} failed={} cloud_in={} cloud_out={} local_in={} local_out={} cost={} time={}s",
+        run_state.tasks.len(),
+        done_count,
+        failed_count,
+        totals.cloud.input,
+        totals.cloud.output,
+        totals.local.input,
+        totals.local.output,
+        cost_str,
+        elapsed
+    );
+
     if success {
         Ok(())
     } else {
-        anyhow::bail!("execution failed: task failed or final verify failed");
+        Err(anyhow::Error::new(
+            crate::flow::errors::FlowError::VerificationFailed(
+                "execution failed: task failed or final verify failed".to_string(),
+            ),
+        ))
     }
 }
 

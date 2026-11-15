@@ -48,8 +48,13 @@ async fn main() {
     debug::init(cli.debug, &home::arqus_home());
     if let Some(crate::cli::Command::Flow(ref flow_args)) = cli.command {
         if let Err(err) = flow::cli::run(flow_args).await {
+            let code = if let Some(flow_err) = err.downcast_ref::<flow::errors::FlowError>() {
+                flow_err.exit_code()
+            } else {
+                1
+            };
             eprintln!("error: {err:#}");
-            std::process::exit(1);
+            std::process::exit(code);
         }
         return;
     }

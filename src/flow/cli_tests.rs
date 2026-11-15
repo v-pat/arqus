@@ -65,3 +65,29 @@ fn test_dry_plan_flag_parsed() {
         panic!("expected Run with dry_plan");
     }
 }
+
+#[test]
+fn test_flow_resume_subcommand_parses() {
+    let cli = Cli::try_parse_from(["arqus", "flow", "resume", "abc12345"]).unwrap();
+    match cli.command {
+        Some(Command::Flow(FlowArgs {
+            command: FlowCommand::Resume(args),
+        })) => {
+            assert_eq!(args.run_id, "abc12345");
+        }
+        _ => panic!("Expected Resume subcommand"),
+    }
+}
+
+#[test]
+fn test_flow_report_subcommand_parses() {
+    let cli = Cli::try_parse_from(["arqus", "flow", "report", "run-987"]).unwrap();
+    match cli.command {
+        Some(Command::Flow(FlowArgs {
+            command: FlowCommand::Report(args),
+        })) => {
+            assert_eq!(args.run_id, "run-987");
+        }
+        _ => panic!("Expected Report subcommand"),
+    }
+}

@@ -123,6 +123,7 @@ impl FlowTestFixture {
     pub fn run_flow_with_env(&self, objective: &str, extra_env: &[(&str, &str)]) -> Output {
         let mut env = vec![
             ("ARQUS_ORCH_KEY", "orch_secret"),
+            ("ARQUS_WORKER_KEY", "worker_secret"),
             ("ARQUS_RETRY_BASE_MS", "5"),
             ("ARQUS_MAX_RETRIES", "1"),
         ];
@@ -134,6 +135,30 @@ impl FlowTestFixture {
             &["flow", "run", objective],
             &env,
         )
+    }
+
+    pub fn run_flow_args(&self, args: &[&str], extra_env: &[(&str, &str)]) -> Output {
+        let mut env = vec![
+            ("ARQUS_ORCH_KEY", "orch_secret"),
+            ("ARQUS_WORKER_KEY", "worker_secret"),
+            ("ARQUS_RETRY_BASE_MS", "5"),
+            ("ARQUS_MAX_RETRIES", "1"),
+        ];
+        env.extend_from_slice(extra_env);
+        let mut full_args = vec!["flow"];
+        full_args.extend_from_slice(args);
+        run_arqus(
+            &self.project.path,
+            &self.home.path,
+            &self.orch_url,
+            &full_args,
+            &env,
+        )
+    }
+
+    pub fn run_id(&self) -> Option<String> {
+        let branch = self.get_flow_branch()?;
+        branch.strip_prefix("arqus/flow/").map(|s| s.to_string())
     }
 
     pub fn get_flow_branch(&self) -> Option<String> {

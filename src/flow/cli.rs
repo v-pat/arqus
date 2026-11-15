@@ -69,12 +69,18 @@ pub async fn run(args: &FlowArgs) -> anyhow::Result<()> {
                 crate::flow::engine::run_loop::run_flow(run_args).await
             }
         }
-        FlowCommand::Resume(_resume_args) => {
-            println!("arqus flow resume");
-            Ok(())
+        FlowCommand::Resume(resume_args) => {
+            crate::flow::engine::resume::run_resume(resume_args).await
         }
-        FlowCommand::Report(_report_args) => {
-            println!("arqus flow report");
+        FlowCommand::Report(report_args) => {
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let repo = std::fs::canonicalize(&cwd)
+                .map_err(|e| anyhow::anyhow!("failed to resolve cwd: {e}"))?;
+            let report =
+                crate::flow::engine::report::load_report_from_dir(&repo, &report_args.run_id)
+                    .map_err(anyhow::Error::new)?;
+            let rendered = crate::flow::engine::report::render_report(&report);
+            println!("{rendered}");
             Ok(())
         }
         FlowCommand::ModelsCheck => models_check().await,

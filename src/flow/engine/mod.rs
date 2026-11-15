@@ -1,4 +1,7 @@
+pub mod budget;
 pub mod events;
+pub mod report;
+pub mod resume;
 pub mod router;
 pub mod run_loop;
 pub mod run_loop_task;

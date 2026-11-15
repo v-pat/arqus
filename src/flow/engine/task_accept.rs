@@ -93,6 +93,22 @@ pub async fn run_takeover_flow(
         sandbox: &ctx.config.sandbox,
         run_id: &state.run_id,
     };
+
+    if let Err(e) =
+        crate::flow::engine::budget::check_cloud_budget(ledger, &ctx.config.limits, None)
+    {
+        state.status = crate::flow::schema::types::RunStatus::BudgetStopped;
+        state.tasks.insert(task_id.to_string(), task_state);
+        state.save(ctx.state_path)?;
+        emit_event(
+            ctx.events_path,
+            "run_finished",
+            None,
+            json!({ "status": "budget_stopped" }),
+        );
+        return Err(e);
+    }
+
     let res = run_takeover_rounds(
         orch_llm,
         &ctx.config.orchestrator,

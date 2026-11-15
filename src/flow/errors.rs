@@ -93,6 +93,17 @@ impl FlowError {
         };
         FailureRecord::new(kind, detail, attempt, executor)
     }
+
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            Self::Config(_)
+            | Self::Schema(_)
+            | Self::MissingApiKeyEnv(_)
+            | Self::UnknownWorker(_)
+            | Self::Malformed(_) => 2,
+            _ => 1,
+        }
+    }
 }
 
 #[cfg(test)]

@@ -106,6 +106,22 @@ pub async fn execute_task(
                     json!({ "status": "redesigning", "redesigns": redesigns }),
                 );
 
+                if let Err(e) = crate::flow::engine::budget::check_cloud_budget(
+                    ledger,
+                    &ctx.config.limits,
+                    None,
+                ) {
+                    run_state.status = crate::flow::schema::types::RunStatus::BudgetStopped;
+                    run_state.save(ctx.state_path)?;
+                    emit_event(
+                        ctx.events_path,
+                        "run_finished",
+                        None,
+                        json!({ "status": "budget_stopped" }),
+                    );
+                    return Err(e);
+                }
+
                 let task_ref = run_state
                     .tasks
                     .get(task_id)

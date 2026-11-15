@@ -121,3 +121,52 @@ async fn test_planner_exhausted_repair_budget_returns_planning_failed() {
         other => panic!("expected PlanningFailed, got: {:?}", other),
     }
 }
+
+#[tokio::test]
+async fn test_planner_stops_when_cloud_budget_exceeded() {
+    let dir = tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("src")).unwrap();
+    fs::write(dir.path().join("src/main.rs"), "fn main() {}\n").unwrap();
+
+    let (llm, _seen) = mock_llm(vec![sample_plan_json()]);
+    let mut config = test_config();
+    config.limits.max_cloud_tokens_per_run = 100;
+
+    let mut ledger = Ledger::new(None);
+    let _ = ledger.record(crate::flow::model::ledger::UsageRecord {
+        ts: 100,
+        run_id: "test".into(),
+        task_id: None,
+        role: crate::flow::model::ledger::Role::Planner,
+        provider: "openai".into(),
+        model: "m".into(),
+        input: 200,
+        output: 50,
+        cache_read: 0,
+        cache_write: 0,
+        estimated: false,
+        cost_usd: None,
+        latency_ms: 10,
+        ok: true,
+    });
+
+    let base_files = vec!["src/main.rs".to_string()];
+    let mut planner = Planner {
+        llm: &llm,
+        config: &config,
+        repo_path: dir.path(),
+        base_files: &base_files,
+        repo_map: "src/main.rs\n",
+        capability_sheet: "Worker: local-9b",
+        ledger: &mut ledger,
+        run_id: "test-run",
+    };
+
+    let result = planner.plan("Implement foo").await;
+    match result {
+        Err(FlowError::BudgetExceeded(msg)) => {
+            assert!(msg.contains("limits.max_cloud_tokens_per_run"));
+        }
+        other => panic!("expected BudgetExceeded, got: {:?}", other),
+    }
+}

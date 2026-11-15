@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -106,6 +106,26 @@ impl Ledger {
             path,
             records: Vec::new(),
         }
+    }
+
+    pub fn load(path: &Path) -> Result<Self, std::io::Error> {
+        let mut records = Vec::new();
+        if path.exists() {
+            let content = std::fs::read_to_string(path)?;
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    let record: UsageRecord = serde_json::from_str(trimmed).map_err(|e| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
+                    })?;
+                    records.push(record);
+                }
+            }
+        }
+        Ok(Self {
+            path: Some(path.to_path_buf()),
+            records,
+        })
     }
 
     pub fn record(&mut self, record: UsageRecord) -> Result<(), std::io::Error> {
