@@ -1679,3 +1679,25 @@
 
 
 
+
+## Stage F4: Edit format   [DONE]
+- Files created or changed:
+  - `src/edit_match.rs`, `src/edit_match_tests.rs`: pure extraction of `apply_exact_edit` with CRLF normalization, exact-once match count checking, and CRLF preservation.
+  - `src/tools/edit.rs`: delegated text matching and CRLF normalization to `crate::edit_match::apply_exact_edit`.
+  - `src/main.rs`: declared `mod edit_match;`.
+  - `src/flow/exec/mod.rs`: declared `pub mod edits;`.
+  - `src/flow/exec/edits.rs`: implemented `EditBlock` (`Search` and `File`), `parse_edits` (extracting blocks, ignoring surrounding prose, supporting CRLF input, returning `FlowError::Declined` for `CANNOT_COMPLETE`, `FlowError::NoOutput` for empty outputs, and `FlowError::ParseError` for unclosed or malformed blocks), and `apply_edits` (scope checking against absolute paths, `..`, and `allowed_writes`, resolving paths with `safety::check_path`, applying edits in-memory sequentially with exact matching hints and ambiguous match detection, and atomically writing modified files to disk via `write_atomic` only if all edits succeed).
+  - `src/flow/exec/edits_tests.rs`, `src/flow/exec/edits_apply_tests.rs`, `src/flow/exec/edits_prop_tests.rs`: unit tests from TESTS.md A3 and property tests from A5 (keeping all files <= 300 lines).
+- What works (command + short real output):
+  - `cargo test --bin arqus flow::exec::edits` -> `test result: ok. 24 passed; 0 failed; 0 ignored; finished in 0.15s`
+  - `cargo test --bin arqus edit` -> `test result: ok. 33 passed; 0 failed; 0 ignored; finished in 0.01s`
+  - `cargo test --bin arqus flow` -> `test result: ok. 95 passed; 0 failed; 0 ignored; finished in 1.02s`
+  - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
+  - `./scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - `FILE` blocks ending with newline are formatted to preserve standard POSIX trailing newlines when non-empty.
+  - `apply_edits` returns `Ok(Vec<String>)` containing the deduplicated list of repo-relative paths modified, in first-touched order.
+- Known problems / TODO:
+  - None. Ready for Stage F5 (Repo map and context builder).
+- Next stage:
+  - Stage F5: Repo map and context builder (`repo/map.rs`, `repo/context.rs`).
