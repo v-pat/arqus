@@ -66,8 +66,7 @@ pub async fn run(args: &FlowArgs) -> anyhow::Result<()> {
             if run_args.dry_plan {
                 run_dry_plan(run_args).await
             } else {
-                println!("arqus flow run");
-                Ok(())
+                crate::flow::engine::run_loop::run_flow(run_args).await
             }
         }
         FlowCommand::Resume(_resume_args) => {

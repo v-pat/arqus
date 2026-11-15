@@ -1795,6 +1795,36 @@
 - Next stage:
   - Stage F8b: Execution loop (`engine/run_loop.rs`).
 
+## Stage F8b: Execution loop   [DONE]
+- Files created or changed:
+  - `src/flow/cli.rs`: wired `arqus flow run` CLI command to invoke `engine::run_loop::run_flow(run_args)`.
+  - `src/flow/engine/mod.rs`: declared modules `events`, `run_loop`, `run_loop_task`, `task_accept`, `task_validate`.
+  - `src/flow/engine/events.rs`, `src/flow/engine/events_tests.rs`: structured event stream logging to `.arqus/flow/<run_id>/events.jsonl` with `append_event` and `emit_event`.
+  - `src/flow/engine/task_validate.rs`, `src/flow/engine/task_validate_tests.rs`: contract validation against orchestrator capability sheets (`is_revised_contract_valid`, `are_subtasks_valid`) and worker LLM construction (`build_worker_llm`).
+  - `src/flow/engine/task_accept.rs`, `src/flow/engine/task_accept_tests.rs`: `TaskContext` struct, verification check runner, git worktree commit/merge on success (`accept_task`), and orchestrator takeover execution (`run_takeover_flow`).
+  - `src/flow/engine/run_loop_task.rs`, `src/flow/engine/run_loop_task_tests.rs`: worker execution loop (`execute_task`) managing rounds, failure recording, redesign escalation (`Revise`, `Split`, `Takeover`), worktree rollback on rejection, and direct orchestrator execution.
+  - `src/flow/engine/run_loop.rs`, `src/flow/engine/run_loop_tests.rs`: top-level entrypoint `run_flow` orchestrating clean repo verification, plan generation/loading, worktree branch creation, scheduler execution loop, final verification, and status finalization.
+  - `src/flow/engine/scheduler_tests.rs`: updated test suite to verify scheduler loop behavior.
+  - `tests/common/mod.rs`: updated test fixture with git initialization, sandbox configuration, and test helper assertions.
+  - `tests/e2e_flow_plan.rs`: end-to-end scenarios S1 (three linear tasks) and S16 (orchestrator-assigned task).
+  - `tests/e2e_flow_ladder.rs`: end-to-end scenarios S2 (worker retry), S3 (redesign revise), S4 (redesign split), S5 (redesign takeover), S6 (max redesigns automatic takeover).
+  - `tests/e2e_flow_ladder_errors.rs`: end-to-end scenarios S7 (takeover fail), S11 (scope violation rollback), S17 (provider 500 retries), S19 (cannot complete declined).
+- What works (command + short real output):
+  - `cargo test --bin arqus flow` -> `test result: ok. 199 passed; 0 failed; 0 ignored; finished in 1.15s`
+  - `cargo test --test e2e_flow_plan --test e2e_flow_ladder --test e2e_flow_ladder_errors` -> `test result: ok. 11 passed; 0 failed; 0 ignored; finished in 2.37s`
+  - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
+  - `./scripts/test-audit-flow.sh` -> `Tests passed: 30, failed: 0. All audit-flow tests passed!`
+  - `./scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - In `execute_task` and `accept_task`, common paths and run configuration are encapsulated in `TaskContext<'a>` to adhere to clippy's function argument limit.
+  - Redesign split validation verifies that subtask dependencies only reference existing subtasks or dependencies from the parent task, and total subtask scope files remain within the orchestrator capability file count.
+  - When git lists worktrees, branch names checked out in active worktrees may have a `+` prefix in `git branch --list`; branch identification handles both `*` and `+` markers.
+- Known problems / TODO:
+  - None. Ready for Stage F8c (Planning failures, resume, budget, report).
+- Next stage:
+  - Stage F8c: Planning failures, resume, budget, report (`engine/run_loop.rs` extensions, budget ledger checks).
+
+
 
 
 

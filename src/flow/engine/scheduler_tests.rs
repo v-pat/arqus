@@ -109,4 +109,3 @@ fn test_scheduler_topological_execution_order() {
     state.tasks.get_mut("T03").unwrap().status = TaskStatus::Done;
     assert_eq!(Scheduler::next_ready(&state), None);
 }
-
