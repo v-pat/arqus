@@ -29,8 +29,7 @@ impl StdioTransport {
             .stderr(Stdio::piped())
             .kill_on_drop(true);
 
-        #[cfg(unix)]
-        cmd.process_group(0);
+        crate::process_group::configure_process_group(&mut cmd);
 
         for (k, v) in env {
             cmd.env(k, v);
@@ -120,15 +119,8 @@ impl StdioTransport {
 
     /// Kill the child process and its process group.
     pub fn kill(&mut self) {
-        #[cfg(unix)]
         if let Some(pid) = self.pid {
-            let target = format!("-{pid}");
-            let _ = std::process::Command::new("kill")
-                .arg("-KILL")
-                .arg(&target)
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
+            crate::process_group::kill_process_group(pid);
         }
         let _ = self.child.start_kill();
     }

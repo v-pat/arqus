@@ -14,6 +14,8 @@ use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 use tokio::task::JoinHandle;
 
+use crate::process_group::{configure_process_group, GroupGuard};
+
 use super::{arg_str, arg_usize, truncate_from_end, ToolOutput};
 
 pub const DEFAULT_TIMEOUT_SECS: usize = 120;
@@ -49,8 +51,7 @@ pub async fn run(args: &Value, cwd: &Path) -> ToolOutput {
         .env("NO_COLOR", "1")
         .env("CI", "1")
         .kill_on_drop(true);
-    #[cfg(unix)]
-    cmd.process_group(0);
+    configure_process_group(&mut cmd);
 
     let mut child = match cmd.spawn() {
         Ok(child) => child,
@@ -215,56 +216,6 @@ fn tail(text: &str) -> String {
     } else {
         body
     }
-}
-
-#[cfg(unix)]
-struct GroupGuard {
-    pid: Option<u32>,
-}
-
-#[cfg(unix)]
-impl GroupGuard {
-    fn new(pid: Option<u32>) -> Self {
-        Self { pid }
-    }
-
-    fn disarm(&mut self) {
-        self.pid = None;
-    }
-
-    /// `kill -KILL -<pid>` kills the whole process group, not just the shell.
-    fn kill(&mut self) {
-        if let Some(pid) = self.pid.take() {
-            let target = format!("-{pid}");
-            let _ = std::process::Command::new("kill")
-                .arg("-KILL")
-                .arg(&target)
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
-        }
-    }
-}
-
-#[cfg(unix)]
-impl Drop for GroupGuard {
-    fn drop(&mut self) {
-        self.kill();
-    }
-}
-
-#[cfg(not(unix))]
-struct GroupGuard;
-
-#[cfg(not(unix))]
-impl GroupGuard {
-    fn new(_pid: Option<u32>) -> Self {
-        Self
-    }
-
-    fn disarm(&mut self) {}
-
-    fn kill(&mut self) {}
 }
 
 #[cfg(test)]

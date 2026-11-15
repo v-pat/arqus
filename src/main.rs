@@ -2,6 +2,7 @@
 
 mod agent;
 mod ai;
+mod atomic_write;
 mod auth;
 mod catalog;
 mod cli;
@@ -15,6 +16,7 @@ mod home;
 mod mcp;
 mod models;
 mod print;
+mod process_group;
 mod resources;
 mod safety;
 mod safety_setup;
