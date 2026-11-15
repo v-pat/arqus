@@ -1699,5 +1699,25 @@
   - `apply_edits` returns `Ok(Vec<String>)` containing the deduplicated list of repo-relative paths modified, in first-touched order.
 - Known problems / TODO:
   - None. Ready for Stage F5 (Repo map and context builder).
+## Stage F5: Repo map and context builder   [DONE]
+- Files created or changed:
+  - `src/flow/repo/mod.rs`: declared `pub mod map;` and `pub mod context;`.
+  - `src/flow/repo/git.rs`, `src/flow/repo/git_tests.rs`: added `list_tracked_files` returning sorted list of tracked files via `git ls-files -z`.
+  - `src/flow/schema/types.rs`: added additive `#[serde(default)] pub changed_files: Vec<String>` to `TaskState`.
+  - `src/flow/repo/map.rs`, `src/flow/repo/map_tests.rs`, `src/flow/repo/map_fixture_tests.rs`: implemented `scan_file_symbols` (line scanners for Rust `fn`/`struct`/`enum`/`trait`/`impl`, Python `def`/`class`, Go `func`/`type`, TypeScript `function`/`class`/`interface`/exported `const`), and `build_repo_map` (deterministic, size-capped repo map using git tracked files, with truncation marker cut cleanly at line boundary).
+  - `src/flow/repo/context.rs`, `src/flow/repo/context_tests.rs`: implemented `render_task_context` rendering task block with `(new file)` annotations for missing allowed writes, upstream dependency summaries from `RunState`, context file sections (whole file or line range), budget checking against token limits with largest file name in `FlowError::BudgetExceeded`, and byte-deterministic output.
+- What works (command + short real output):
+  - `cargo test --bin arqus flow::repo::map` -> `test result: ok. 8 passed; 0 failed; 0 ignored; finished in 0.22s`
+  - `cargo test --bin arqus flow::repo::context` -> `test result: ok. 6 passed; 0 failed; 0 ignored; finished in 0.00s`
+  - `cargo test --bin arqus flow` -> `test result: ok. 110 passed; 0 failed; 0 ignored; finished in 1.02s`
+  - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
+  - `./scripts/test-audit-flow.sh` -> `Tests passed: 30, failed: 0. All audit-flow tests passed!`
+  - `./scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - Python declarations keep parameter signatures up to trailing `:` for clean method / function definitions, taking the last colon so type annotations like `(url: str):` remain intact.
+  - When a repo map exceeds `max_bytes`, the content slice is cut at the last newline before `max_bytes - TRUNCATION_MARKER.len()` so the truncation marker begins on a clean line.
+- Known problems / TODO:
+  - None. Ready for Stage F6 (Validator, capability sheet, planner).
 - Next stage:
-  - Stage F5: Repo map and context builder (`repo/map.rs`, `repo/context.rs`).
+  - Stage F6: Validator, capability sheet, planner (`planning/validator.rs`, `capability.rs`, `prompts.rs`, `planner.rs`, and `arqus flow run --dry-plan`).
+

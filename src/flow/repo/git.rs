@@ -211,6 +211,31 @@ pub fn commit_changes(
     get_head_commit(worktree)
 }
 
+/// Returns a sorted list of all tracked file paths in the repository using `git ls-files`.
+pub fn list_tracked_files(repo: &Path) -> Result<Vec<String>, FlowError> {
+    let output = Command::new("git")
+        .args(["ls-files", "-z"])
+        .current_dir(repo)
+        .output()
+        .map_err(|err| FlowError::Git(format!("failed to run git ls-files: {err}")))?;
+
+    if !output.status.success() {
+        let err_msg = String::from_utf8_lossy(&output.stderr);
+        return Err(FlowError::Git(format!("git ls-files failed: {err_msg}")));
+    }
+
+    let raw = output.stdout;
+    let mut files = Vec::new();
+    for entry in raw.split(|&b| b == 0) {
+        if !entry.is_empty() {
+            let path_str = String::from_utf8_lossy(entry).to_string();
+            files.push(path_str);
+        }
+    }
+    files.sort();
+    Ok(files)
+}
+
 #[cfg(test)]
 #[path = "git_tests.rs"]
 mod tests;

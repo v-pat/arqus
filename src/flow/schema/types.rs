@@ -155,6 +155,8 @@ pub struct TaskState {
     pub split_depth: u32,
     pub failures: Vec<FailureRecord>,
     pub commit: Option<String>,
+    #[serde(default)]
+    pub changed_files: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]

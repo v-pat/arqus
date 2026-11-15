@@ -183,3 +183,16 @@ fn test_base_branch_head_unchanged_after_worktree_commit() {
         &["worktree", "remove", "--force", worktree.to_str().unwrap()],
     );
 }
+
+#[test]
+fn test_list_tracked_files() {
+    let (_dir, repo) = init_git_repo();
+    std::fs::create_dir_all(repo.join("src")).unwrap();
+    std::fs::write(repo.join("src/main.rs"), "fn main() {}\n").unwrap();
+    std::fs::write(repo.join("untracked.txt"), "ignored\n").unwrap();
+    run_git(&repo, &["add", "src/main.rs"]);
+
+    let tracked = list_tracked_files(&repo).unwrap();
+    assert_eq!(tracked, vec!["README.md", "src/main.rs"]);
+    assert!(!tracked.contains(&"untracked.txt".to_string()));
+}
