@@ -3,17 +3,17 @@
 A small terminal coding agent written in Rust, modeled on the ideas behind
 **pi**: a tiny core, four tools (`read`, `write`, `edit`, `bash`), extensible
 **Model Context Protocol (MCP)** support, streaming model calls, append-only JSONL
-sessions with branching, compaction, and a ratatui TUI.
+sessions with branching, compaction, a ratatui TUI, and **multi-model flow orchestration**.
 
 `arqus` is a learning project. It works and it is tested, but it is not a
 production tool. Read [Limitations](#limitations) before pointing it at a real
 repository.
 
 - Version: `0.2.0` (`arqus --version` prints it)
-- Status: stages 0 to 25 are done; stage 26 is the release gate; Stage M (MCP) complete
-- Tests: `cargo test` runs 629 tests (581 unit, 48 end-to-end) with no network
+- Status: Core agent (Stages 0–26 done), Model Context Protocol (Stage M done), and Multi-Model Flow (Stages F0–F11 done)
+- Tests: `cargo test` runs 900 tests (826 unit, 74 end-to-end) with no network, plus 53 Python evaluation tests
 - Crates: `serde`, `serde_json`, `anyhow`, `uuid`, `dirs`, `tokio`, `reqwest`,
-  `futures-util`, `clap`, `ratatui`, `crossterm`, `unicode-width`
+  `futures-util`, `clap`, `ratatui`, `crossterm`, `unicode-width`, `shlex` (dev: `proptest`, `tempfile`)
 
 ## What it does
 
@@ -22,6 +22,8 @@ repository.
   prompt).
 - Connects to Model Context Protocol (MCP) servers (e.g. Serena semantic code analysis)
   via stdio JSON-RPC 2.0 with AST schema pruning, KV cache stability, and output caps.
+- Orchestrates multi-model collaborative execution (`arqus flow`) pairing capable cloud
+  orchestrator models with fast, low-cost local or specialized worker models.
 - Stores every session as an append-only JSONL file with an `id` / `parent_id`
   tree. Forking and moving the leaf are first-class.
 - Rebuilds the model context from the session with a pure function, including
@@ -50,13 +52,22 @@ Expected test result (no network, no real key):
 
 ```sh
 $ cargo test
-test result: ok. 581 passed; 0 failed; 0 ignored
+test result: ok. 826 passed; 0 failed; 0 ignored
 test result: ok. 4 passed; 0 failed; 0 ignored      # e2e_basic
 test result: ok. 2 passed; 0 failed; 0 ignored      # e2e_connect
 test result: ok. 9 passed; 0 failed; 0 ignored      # e2e_cost
 test result: ok. 2 passed; 0 failed; 0 ignored      # e2e_crash
 test result: ok. 12 passed; 0 failed; 0 ignored     # e2e_errors
-test result: ok. 4 passed; 0 failed; 0 ignored      # e2e_safety
+test result: ok. 1 passed; 0 failed; 0 ignored      # e2e_flow_budget
+test result: ok. 4 passed; 0 failed; 0 ignored      # e2e_flow_cli
+test result: ok. 1 passed; 0 failed; 0 ignored      # e2e_flow_dry_plan
+test result: ok. 5 passed; 0 failed; 0 ignored      # e2e_flow_ladder
+test result: ok. 4 passed; 0 failed; 0 ignored      # e2e_flow_ladder_errors
+test result: ok. 1 passed; 0 failed; 0 ignored      # e2e_flow_model
+test result: ok. 2 passed; 0 failed; 0 ignored      # e2e_flow_plan
+test result: ok. 4 passed; 0 failed; 0 ignored      # e2e_flow_plan_repairs
+test result: ok. 1 passed; 0 failed; 0 ignored      # e2e_flow_resume
+test result: ok. 7 passed; 0 failed; 0 ignored      # e2e_safety
 test result: ok. 15 passed; 0 failed; 0 ignored     # e2e_stream
 test result: ok. 0 passed; 0 failed; 6 ignored      # live_openrouter
 ```
@@ -70,8 +81,8 @@ arqus --help
 ```
 
 `scripts/check.sh` runs everything CI runs: `cargo fmt --check`, clippy with
-`-D warnings`, `cargo test`, `cargo build --release`, and a scan for committed
-API keys.
+`-D warnings`, `cargo test`, `cargo build --release`, secret scan, flow audit,
+and Python evaluation tests.
 
 ## Quick start
 
@@ -155,8 +166,12 @@ Executed on live OpenRouter using `deepseek/deepseek-v4.1-flash-1017`:
 ## CLI
 
 ```
-arqus [OPTIONS]
+arqus [OPTIONS] [COMMAND]
 
+Commands:
+  flow                      Multi-model collaborative execution harness
+
+Options:
   -p, --prompt <PROMPT>     Run one prompt in print mode
   -c, --continue            Continue the latest session for this directory
       --no-session          Use a temporary session instead of <ARQUS_HOME>/sessions
@@ -164,6 +179,9 @@ arqus [OPTIONS]
       --model <PROVIDER:MODEL>
                             Pick provider and model, for example
                             anthropic:claude-sonnet-4
+      --mode <ask|auto|plan>
+                            Execution mode: interactive approvals (ask),
+                            unattended tools (auto), or read-only (plan)
       --max-cost <DOLLARS>  Stop when one prompt costs more than this
       --max-session-cost <DOLLARS>
                             Stop when the whole session costs more than this
@@ -187,7 +205,7 @@ Exit codes:
 | `1` | the prompt or run failed: provider error, cost/token limit, I/O error |
 | `2` | bad configuration or usage: bad flag, unknown provider, missing model |
 
-- With no `-p`, `arqus` starts the TUI.
+- With no `-p` or subcommand, `arqus` starts the interactive TUI.
 - Known providers: `openai`, `openrouter`, `anthropic`. Any other name uses the
   generic OpenAI-compatible adapter, which covers most local servers.
 - The generic adapter's default base URL is OpenRouter's. Set `ARQUS_BASE_URL`
@@ -195,9 +213,9 @@ Exit codes:
 
 ## Flow
 
-`arqus flow` is a multi-model collaborative execution harness designed to minimise expensive cloud tokens by pairing a capable cloud orchestrator with fast, low-cost local worker models (e.g. Qwen or Llama via Ollama/vLLM).
+`arqus flow` is a multi-model collaborative execution harness designed to minimize expensive cloud tokens by pairing a capable cloud orchestrator (e.g. Claude 3.5 Sonnet, DeepSeek V3, or GPT-4o) with fast, low-cost local or specialized worker models (e.g. Qwen 2.5 Coder or Llama 3 via Ollama/vLLM).
 
-The orchestrator breaks natural language objectives into discrete, contract-bounded nano-tasks. Local workers implement one-shot edits against an isolated git worktree, and the harness verifies each change with deterministic commands before committing.
+The orchestrator breaks high-level objectives into discrete, contract-bounded nano-tasks (`TaskContract`). Local workers implement one-shot edits against an isolated Git worktree branch, and the harness strictly verifies each change with deterministic tests and scope assertions before committing.
 
 ### CLI
 
@@ -210,13 +228,91 @@ The orchestrator breaks natural language objectives into discrete, contract-boun
 - `arqus flow models-check`  
   Performs live health checks against all configured orchestrator and worker models.
 
+### Configuration (`settings.json`)
+
+Configure flow in `<ARQUS_HOME>/settings.json` or `<cwd>/.arqus/settings.json` under the `"flow"` key:
+
+```json
+{
+  "flow": {
+    "orchestrator": {
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-chat",
+      "base_url": "https://openrouter.ai/api/v1",
+      "temperature": 0.2,
+      "max_output_tokens": 4096
+    },
+    "worker": {
+      "provider": "openai",
+      "model": "qwen2.5-coder:7b",
+      "base_url": "http://127.0.0.1:11434/v1",
+      "temperature": 0.0,
+      "limits": {
+        "max_context_tokens": 8000,
+        "max_scope_files": 3,
+        "max_changed_lines": 120
+      }
+    },
+    "limits": {
+      "max_cost": 2.0,
+      "max_cloud_tokens": 100000,
+      "max_redesigns": 3,
+      "max_worker_rounds": 4,
+      "max_takeover_rounds": 2,
+      "worker_timeout_secs": 120
+    },
+    "allowlist": [
+      "cargo test",
+      "cargo check",
+      "pytest",
+      "npm test",
+      "go test ./..."
+    ],
+    "protected_paths": [
+      ".github/**",
+      ".git/**",
+      "migrations/**"
+    ]
+  }
+}
+```
+
+### Role API Keys
+
+Flow supports dedicated API keys for orchestrator and worker roles:
+- `ARQUS_ORCHESTRATOR_KEY` (or `ORCHESTRATOR_API_KEY`): API key used for planning, redesigns, and orchestrator takeovers.
+- `ARQUS_WORKER_KEY` (or `WORKER_API_KEY`): API key used for worker tasks (defaults to empty for local servers).
+- Falls back to `ARQUS_API_KEY` if role keys are unset.
+
 ### How it works
 
-1. **Planning**: The orchestrator inspects the repository map and task objectives to produce a DAG of `TaskContract` items (with strict path constraints, context files, and verification commands).
-2. **Execution**: The scheduler deterministically picks ready tasks. Local workers receive concise prompts and output structured `SEARCH`/`REPLACE` or whole `FILE` blocks.
-3. **Deterministic Verification**: Edits are applied atomically in memory. The harness validates allowed file scopes, line count caps, and executes allowlisted test commands.
-4. **Fallback Ladder**: If a worker fails, it retries with feedback. If worker attempts are exhausted, the orchestrator redesigns (revises the contract, splits into subtasks, or executes an orchestrator takeover).
-5. **Atomic State & Accounting**: All transitions and token tallies are persisted atomically to `.arqus/flow/<run_id>/state.json` and `usage.jsonl`. At run end, task statistics append to `<ARQUS_HOME>/flow/stats.jsonl`.
+1. **Planning & Context Building**: The orchestrator inspects the repository map and task objectives to produce a DAG of `TaskContract` items (with strict path constraints, context files, and verification commands). If the orchestrator needs to view additional files during planning, it requests them via need-files rounds before finalizing the plan.
+2. **Deterministic Plan Validation**: The plan is validated against 8 structural rules (no circular dependencies, verify commands must match the allowlist, worker scope constraints respected, no protected path modifications). If invalid, repair messages are exchanged with the orchestrator.
+3. **Execution in Isolated Worktree**: The scheduler deterministically picks ready tasks. The harness creates a clean worktree on branch `arqus/flow/<run_id>`. Workers receive concise prompts containing only the task objective, context file slices, and edit format instructions. Workers output structured `SEARCH`/`REPLACE` or whole `FILE` blocks.
+4. **Scope Checking & Deterministic Verification**: Edits are applied in memory and checked:
+   - Modified/created files must be a subset of `allowed_writes`.
+   - Changed lines must not exceed `max_changed_lines_hard`.
+   - Verification commands are executed in a sandboxed process group.
+   If verified, the change is committed to the worktree branch. If rejected, the worktree is rolled back to HEAD.
+5. **Fallback Ladder & Redesign**:
+   - **Worker Retry**: On verification or scope failure, the worker retries with the truncated compiler/test error.
+   - **Redesign Escalation**: If worker attempts are exhausted, the orchestrator evaluates the failure records and chooses to:
+     - `Revise`: Update the contract with clearer context or instructions.
+     - `Split`: Break the task into 2–4 smaller subtasks (`<task_id>.1`, `<task_id>.2`, etc.).
+     - `Takeover`: Fall back to direct execution by the orchestrator.
+6. **Atomic State & Accounting**: Transitions and token tallies are persisted atomically to `.arqus/flow/<run_id>/state.json` and `usage.jsonl`. At run end, task statistics append to `<ARQUS_HOME>/flow/stats.jsonl` to track worker pass rates by category.
+
+### Benchmarks & Evaluation
+
+Flow includes two dedicated evaluation benchmarks:
+- **Judging Benchmark (`evals/flow/judging/`)**: 30 diverse multi-language software engineering tasks (10 Small, 12 Medium, 8 Large across Rust, Python, Go, and TypeScript) with 6 held-out tasks for generalizability validation.
+- **Nano Evaluation Benchmark (`evals/flow/nano/`)**: 60 isolated contract tasks spanning 8 delegable categories (`boilerplate`, `single_function`, `tests`, `docs`, `local_refactor`, `local_bugfix`, `multi_file`, `other`) to empirically profile worker model capability.
+- **Evaluation Runners**:
+  ```sh
+  ./scripts/run-flow-evals.sh            # Run judging evaluation suite across conditions
+  ./scripts/run-flow-nano.sh             # Run nano evaluation suite and update profile stats
+  ./scripts/build-flow-profile.sh        # Aggregate pass rates into profile_stats.json
+  ```
 
 ### Honest limitations
 
@@ -234,7 +330,9 @@ The orchestrator breaks natural language objectives into discrete, contract-boun
 
 | Variable | Meaning | Default |
 | --- | --- | --- |
-| `ARQUS_API_KEY` | Key for every provider. The only accepted key source. | empty |
+| `ARQUS_API_KEY` | Key for every provider. The only accepted key source for general sessions. | empty |
+| `ARQUS_ORCHESTRATOR_KEY` | Dedicated API key for the flow orchestrator role | empty |
+| `ARQUS_WORKER_KEY` | Dedicated API key for the flow worker role | empty |
 | `ARQUS_MODEL` | Model name | empty |
 | `ARQUS_PROVIDER` | Provider name | `openai` |
 | `ARQUS_BASE_URL` | Endpoint | per provider |
@@ -650,10 +748,10 @@ The evaluation suite tests `arqus` on realistic coding tasks inside isolated Git
 
 | Layer | What | Command | Network | Cost |
 |---|---|---|---|---|
-| **L1 Unit** | Pure functions, token math, parsers, TUI logic (564 tests) | `cargo test --bin arqus` | No | Free |
-| **L2 E2E** | Black-box tests against in-process mock SSE HTTP server (48 tests) | `cargo test --test 'e2e_*'` | Local loopback | Free |
+| **L1 Unit** | Pure functions, token math, parsers, TUI, flow logic (826 tests) | `cargo test --bin arqus` | No | Free |
+| **L2 E2E** | Black-box tests against in-process mock SSE HTTP server (74 tests) | `cargo test --test 'e2e_*'` | Local loopback | Free |
 | **L3 Live** | Live smoke tests against OpenRouter (`tests/live_openrouter.rs`) | `scripts/live-smoke.sh` | Yes | Cents |
-| **L4 Evals** | 13 live coding benchmark tasks with pass/fail evaluation | `scripts/run-evals.sh` | Yes | Cents |
+| **L4 Evals** | 13-task baseline agent eval, 30-task flow judging suite, 60-contract nano eval suite, 53 Python unit tests | `scripts/run-evals.sh`, `scripts/run-flow-evals.sh`, `scripts/run-flow-nano.sh` | Yes / No (unit) | Cents |
 
 **The One-Stop Health Check (`scripts/check.sh`)**:
 Before opening a pull request or committing changes, run:
@@ -663,9 +761,11 @@ Before opening a pull request or committing changes, run:
 This runs:
 1. `cargo fmt --check`
 2. `cargo clippy --all-targets -- -D warnings`
-3. `cargo test` (all unit and e2e integration tests)
+3. `cargo test` (all 900 unit and e2e integration tests)
 4. `cargo build --release`
 5. Secret scanner (greps for committed API keys)
+6. Flow architectural audit (`scripts/audit-flow.sh` and `scripts/test-audit-flow.sh`)
+7. Python evaluation unit tests (`evals/tests/`)
 
 ### 5. Contributor Rules & Code Philosophy
 
@@ -679,7 +779,7 @@ To keep the codebase lean and maintainable:
 
 ```
 src/
-  main.rs           CLI, print mode, wiring
+  main.rs           CLI, print mode, subcommand wiring
   cli.rs            flags, limit resolution, help text
   types.rs          provider-neutral Message, Block, Entry, Header
   session.rs        JSONL store, tree walking, session listing
@@ -695,22 +795,39 @@ src/
   cost.rs           totals, limits, summary lines
   tree.rs           tree rows, path text, fork
   debug.rs          redacted JSON-lines debug log
+  atomic_write.rs   atomic temp-file write with permissions preservation
+  process_group.rs  process group isolation and graceful/forced termination
+  edit_match.rs     exact-once text replacement with CRLF normalization
   ai/               provider-agnostic streaming
     mod.rs            ToolDef, LlmRequest, StreamEvent, Llm
-    openai.rs         OpenAI-compatible adapter
+    openai.rs         OpenAI-compatible adapter (with extra_body)
     openrouter.rs     OpenRouter adapter (reuses OpenAI body and SSE)
     anthropic.rs      Anthropic messages adapter
     sse.rs            SSE parser
     mock.rs           scripted provider for tests
   tools/            read, write, edit, bash
   mcp/              Model Context Protocol (JSON-RPC, schema pruning, manager)
-  tui/              ratatui interface
+  tui/              ratatui interface (Elm pattern: model, update, view)
+  flow/             multi-model collaborative execution harness
+    cli.rs            flow subcommands (run, resume, report, models-check)
+    config/           flow settings, worker profiles, role keys
+    errors.rs         typed FlowError enum with hand-written Display
+    schema/           TaskContract, Plan, Edit, TaskState, RunState, Issue
+    model/            completion, json extraction & repair, token/cost ledger
+    repo/             git worktree management, repo map & symbol scanner, task context
+    exec/             command sandbox, scope & verify checks, edits parsing, worker, takeover
+    planning/         plan validator, capability sheets, prompt templates, planner, redesign
+    engine/           state machine, scheduler, router, run loop, event stream, stats
 ```
 
 Import direction: `types` is at the bottom. `session`, `context`, `compaction`
 depend on it; `ai`, `tools` and `mcp` sit above; `agent` above those; `main` and `tui`
 on top. `ai/`, `tools/` and `mcp/` never import `session`. `tui/` never imports `ai/`
 directly; it uses `Runtime`.
+
+`flow/` imports `types`, `ai`, `cost`, `safety`, `settings`, `debug`, `atomic_write`,
+`edit_match`, and `process_group`. It strictly never imports `session`, `tui`, `agent`,
+`runtime`, or `compaction`. Only `main.rs` imports `flow/`.
 
 ## Docker
 
@@ -731,9 +848,9 @@ arqus-docker --yolo -p "fix the failing test"   # print mode, no approvals
 
 The wrapper mounts the current folder at `/work`, keeps sessions in
 `~/.arqus/docker-state` (`ARQUS_DOCKER_STATE` overrides it), and forwards only
-`ARQUS_API_KEY`, `ARQUS_MODEL`, `ARQUS_PROVIDER`, `ARQUS_BASE_URL` and
-`ARQUS_CONTEXT_WINDOW`. It drops all capabilities, sets
-`no-new-privileges`, and caps memory (`ARQUS_DOCKER_MEMORY`, default `4g`),
+`ARQUS_API_KEY`, `ARQUS_ORCHESTRATOR_KEY`, `ARQUS_WORKER_KEY`, `ARQUS_MODEL`,
+`ARQUS_PROVIDER`, `ARQUS_BASE_URL` and `ARQUS_CONTEXT_WINDOW`. It drops all capabilities,
+sets `no-new-privileges`, and caps memory (`ARQUS_DOCKER_MEMORY`, default `4g`),
 CPUs (`ARQUS_DOCKER_CPUS`, default `4`) and processes (512).
 
 `scripts/docker-smoke.sh` builds the image and checks: the container user is
