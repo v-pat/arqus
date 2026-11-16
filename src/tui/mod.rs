@@ -85,6 +85,7 @@ use crate::settings::{EnvOverrides, Settings};
 use crate::state::State;
 
 use app::App;
+pub use footer::Mode;
 use history::History;
 use input::InputState;
 use msg::Effect;
@@ -101,6 +102,8 @@ pub struct Startup {
     pub resources: Resources,
     /// Provider name from the resolved configuration.
     pub provider: String,
+    /// Explicit mode from CLI --mode
+    pub initial_mode: Option<footer::Mode>,
     /// True when approvals are off (`--yolo`), so the footer says `auto`.
     pub auto: bool,
     /// Open the Connect dialog on the first frame.
@@ -161,17 +164,24 @@ pub(crate) fn init_app(startup: Startup) -> (App, Runtime, Vec<Effect>) {
     app.settings = startup.settings;
     app.arqus_home = startup.arqus_home;
     runtime.cfg.compaction.enabled = app.state.compaction;
-    app.mode = if runtime.cfg.plan {
+    app.mode = if let Some(m) = startup.initial_mode {
+        m
+    } else if runtime.cfg.plan {
         footer::Mode::Plan
     } else if auto || app.state.default_mode.as_deref() == Some("auto") {
         footer::Mode::Auto
+    } else if app.state.default_mode.as_deref() == Some("nanoflow")
+        || app.state.default_mode.as_deref() == Some("nanoflow(experimental)")
+        || app.state.default_mode.as_deref() == Some("flow")
+    {
+        footer::Mode::Nanoflow
     } else {
         footer::Mode::Ask
     };
     runtime.cfg.plan = app.mode == footer::Mode::Plan;
     runtime.cfg.approver = match app.mode {
         footer::Mode::Ask | footer::Mode::Plan => crate::safety::Approver::Interactive,
-        footer::Mode::Auto => crate::safety::Approver::Auto,
+        footer::Mode::Auto | footer::Mode::Nanoflow => crate::safety::Approver::Auto,
     };
     app.auto_warned = app.mode == footer::Mode::Auto;
     let depth = ColorDepth::from_env();

@@ -61,6 +61,84 @@ pub(super) fn spawn_turn(
     Some((handle, path))
 }
 
+pub(super) fn spawn_nanoflow(
+    app: &mut App,
+    runtime: &Runtime,
+    event_tx: &mpsc::Sender<AgentEvent>,
+    done_tx: &mpsc::Sender<Session>,
+    text: String,
+) -> Option<(JoinHandle<()>, PathBuf)> {
+    let mut session = app.session.take()?;
+    let path = session.path.clone();
+    let runtime = runtime.clone();
+    let events = event_tx.clone();
+    let errors = event_tx.clone();
+    let done = done_tx.clone();
+    let cwd = app.cwd.clone();
+
+    let handle = tokio::spawn(async move {
+        let _ = session.append(crate::types::EntryKind::Message {
+            message: crate::types::Message::User { text: text.clone() },
+        });
+        let _ = events
+            .send(AgentEvent::Notice(
+                "[nanoflow(experimental)] Planning and executing multi-model flow...".to_string(),
+            ))
+            .await;
+        let orch_model = if runtime.model_name.is_empty() || runtime.model_name == "(no model)" {
+            None
+        } else {
+            Some(runtime.model_name.clone())
+        };
+        let run_args = crate::flow::cli::RunArgs {
+            objective: text.clone(),
+            repo: cwd,
+            orchestrator_model: orch_model.clone(),
+            worker: None,
+            max_cost: Some(runtime.cfg.limits.max_cost_per_run),
+            max_cloud_tokens: Some(runtime.cfg.limits.max_tokens_per_run),
+            dry_plan: false,
+            log_prompts: false,
+            debug: false,
+        };
+        let result = crate::flow::engine::run_loop::run_flow(&run_args).await;
+        match result {
+            Ok(()) => {
+                let msg = "Nanoflow execution complete. All tasks planned, verified, and merged."
+                    .to_string();
+                let _ = session.append(crate::types::EntryKind::Message {
+                    message: crate::types::Message::Assistant {
+                        blocks: vec![crate::types::Block::Text { text: msg.clone() }],
+                        provider: "flow".to_string(),
+                        model: orch_model.unwrap_or_else(|| "nanoflow".to_string()),
+                        usage: None,
+                        stop: crate::types::StopReason::Stop,
+                    },
+                });
+                let _ = events.send(AgentEvent::TextDelta(msg)).await;
+                let _ = events.send(AgentEvent::TurnDone).await;
+            }
+            Err(err) => {
+                let err_msg = format!("nanoflow failed: {err:#}");
+                let _ = session.append(crate::types::EntryKind::Message {
+                    message: crate::types::Message::Assistant {
+                        blocks: vec![crate::types::Block::Text {
+                            text: err_msg.clone(),
+                        }],
+                        provider: "flow".to_string(),
+                        model: orch_model.unwrap_or_else(|| "nanoflow".to_string()),
+                        usage: None,
+                        stop: crate::types::StopReason::Error,
+                    },
+                });
+                let _ = errors.send(AgentEvent::Error(err_msg)).await;
+            }
+        }
+        let _ = done.send(session).await;
+    });
+    Some((handle, path))
+}
+
 pub(super) fn spawn_compact(
     app: &mut App,
     runtime: &Runtime,

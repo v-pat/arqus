@@ -18,12 +18,13 @@ use super::{footer, running, toast, welcome};
 pub const MIN_WIDTH: u16 = 60;
 pub const MIN_HEIGHT: u16 = 15;
 
-/// Editor border follows the mode: ask = border, auto = warning, plan = accent.
+/// Editor border follows the mode: ask = border, auto = warning, plan = accent, nanoflow = success.
 pub fn border_color(mode: footer::Mode, theme: &Theme) -> ratatui::style::Color {
     match mode {
         footer::Mode::Ask => theme.border,
         footer::Mode::Auto => theme.warning,
         footer::Mode::Plan => theme.accent,
+        footer::Mode::Nanoflow => theme.success,
     }
 }
 

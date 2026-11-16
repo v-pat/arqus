@@ -35,7 +35,12 @@ pub(super) async fn execute(
         Effect::RunPrompt(text) => {
             let expanded = crate::resources::expand_input(resources, &text);
             let expanded = super::mention::expand(&expanded, std::path::Path::new(&app.cwd));
-            match tasks::spawn_turn(app, runtime, event_tx, done_tx, expanded) {
+            let spawned = if app.mode == super::footer::Mode::Nanoflow {
+                tasks::spawn_nanoflow(app, runtime, event_tx, done_tx, expanded)
+            } else {
+                tasks::spawn_turn(app, runtime, event_tx, done_tx, expanded)
+            };
+            match spawned {
                 Some((handle, path)) => {
                     *task = Some(handle);
                     *active_path = Some(path);
@@ -347,7 +352,7 @@ pub(super) async fn execute(
             runtime.cfg.plan = mode == Mode::Plan;
             runtime.cfg.approver = match mode {
                 Mode::Ask | Mode::Plan => Approver::Interactive,
-                Mode::Auto => Approver::Auto,
+                Mode::Auto | Mode::Nanoflow => Approver::Auto,
             };
         }
         Effect::SetCompaction(enabled) => {

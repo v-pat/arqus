@@ -146,13 +146,12 @@ impl SettingsPicker {
                     .unwrap_or(0);
                 self.themes[(index + 1) % self.themes.len()].clone()
             }
-            Setting::DefaultMode => {
-                if row.value == "ask" {
-                    "auto".to_string()
-                } else {
-                    "ask".to_string()
-                }
-            }
+            Setting::DefaultMode => match row.value.as_str() {
+                "ask" => "auto".to_string(),
+                "auto" => "plan".to_string(),
+                "plan" => "nanoflow(experimental)".to_string(),
+                _ => "ask".to_string(),
+            },
             _ => on_off(row.value != "on"),
         }
     }

@@ -118,7 +118,7 @@ pub fn registry() -> Vec<Command> {
         command(
             "mode",
             &[],
-            "ask · auto · plan",
+            "ask · auto · plan · nanoflow(experimental)",
             "Model",
             Some("shift+tab"),
             Mode,

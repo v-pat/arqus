@@ -7,6 +7,7 @@ pub enum Mode {
     Ask,
     Auto,
     Plan,
+    Nanoflow,
 }
 
 impl Mode {
@@ -15,15 +16,17 @@ impl Mode {
             Mode::Ask => "ask",
             Mode::Auto => "auto",
             Mode::Plan => "plan",
+            Mode::Nanoflow => "nanoflow(experimental)",
         }
     }
 
-    /// Shift+Tab order: ask, auto, plan, ask.
+    /// Shift+Tab order: ask, auto, plan, nanoflow, ask.
     pub fn next(self) -> Mode {
         match self {
             Mode::Ask => Mode::Auto,
             Mode::Auto => Mode::Plan,
-            Mode::Plan => Mode::Ask,
+            Mode::Plan => Mode::Nanoflow,
+            Mode::Nanoflow => Mode::Ask,
         }
     }
 
@@ -33,6 +36,7 @@ impl Mode {
             "ask" => Some(Mode::Ask),
             "auto" => Some(Mode::Auto),
             "plan" => Some(Mode::Plan),
+            "nanoflow" | "nanoflow(experimental)" | "flow" => Some(Mode::Nanoflow),
             _ => None,
         }
     }

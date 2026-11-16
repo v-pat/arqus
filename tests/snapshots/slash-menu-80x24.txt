@@ -14,7 +14,7 @@
 
 
     ┌ commands ────────────────────────────────────────────────────────────┐
-    │ ▸ /mode  ask · auto · plan  shift+tab                                │
+    │ ▸ /mode  ask · auto · plan · nanoflow(experimental)  shift+tab       │
     │   /models  Pick a model  ctrl+l                                      │
     │   /model  Switch model: /model provider:model                        │
     └──────────────────────────────────────────────────────────────────────┘

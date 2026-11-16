@@ -124,6 +124,24 @@ pub async fn print_mode(cli: &Cli, prompt: String) -> anyhow::Result<()> {
         return Ok(());
     }
 
+    if safety_setup::is_nanoflow(cli.mode.as_deref(), &settings) {
+        let run_args = crate::flow::cli::RunArgs {
+            objective: prompt,
+            repo: ".".to_string(),
+            orchestrator_model: cli.model.clone(),
+            worker: None,
+            max_cost: cli.max_cost,
+            max_cloud_tokens: cli.max_tokens_per_run,
+            dry_plan: false,
+            log_prompts: false,
+            debug: cli.debug,
+        };
+        let flow_args = crate::flow::cli::FlowArgs {
+            command: crate::flow::cli::FlowCommand::Run(run_args),
+        };
+        return crate::flow::cli::run(&flow_args).await;
+    }
+
     let (tx, mut rx) = tokio::sync::mpsc::channel(256);
     // Print mode has no steering: the sender is dropped right away.
     let (_steer_tx, steer_rx) = tokio::sync::mpsc::unbounded_channel::<String>();

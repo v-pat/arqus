@@ -253,5 +253,32 @@ fn invalid_mode_flag_exits_2() {
     );
 
     assert_eq!(out.status.code(), Some(2));
-    assert!(stderr(&out).contains("unknown mode 'unknown_mode': expected ask, auto, or plan"));
+    assert!(
+        stderr(&out).contains("unknown mode 'unknown_mode': expected ask, auto, plan, or nanoflow")
+    );
+}
+
+#[test]
+fn nanoflow_mode_flag_routes_to_flow_engine_e2e() {
+    let project = TempDir::new("nanoflow_mode_project");
+    let home = TempDir::new("nanoflow_mode_home");
+    let fake = FakeLlm::start(vec![]);
+
+    let out = run_arqus_without_yolo(
+        &project.path,
+        &home.path,
+        &fake.url,
+        &[
+            "--no-session",
+            "--mode",
+            "nanoflow",
+            "-p",
+            "plan the change",
+        ],
+        &[],
+    );
+
+    // Because project is not a git repo, flow engine rejects it with a git repo error
+    assert_eq!(out.status.code(), Some(1));
+    assert!(stderr(&out).contains("not a git repository"));
 }

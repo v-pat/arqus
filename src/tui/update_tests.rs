@@ -205,7 +205,7 @@ fn palette_escape_closes_without_running() {
 }
 
 #[test]
-fn shift_tab_cycles_the_three_modes() {
+fn shift_tab_cycles_the_modes() {
     use crate::tui::footer::Mode;
     let mut app = app();
     assert_eq!(
@@ -218,6 +218,11 @@ fn shift_tab_cycles_the_three_modes() {
         vec![Effect::SetMode(Mode::Plan)]
     );
     assert_eq!(app.mode, Mode::Plan);
+    assert_eq!(
+        replay_keys(&mut app, "shift+tab"),
+        vec![Effect::SetMode(Mode::Nanoflow)]
+    );
+    assert_eq!(app.mode, Mode::Nanoflow);
     assert_eq!(
         replay_keys(&mut app, "shift+tab"),
         vec![Effect::SetMode(Mode::Ask)]

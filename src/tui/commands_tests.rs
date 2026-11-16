@@ -104,6 +104,8 @@ fn mode_takes_an_argument_and_cycles_without_one() {
     dispatch(&mut app, "/mode plan");
     assert_eq!(app.mode, Mode::Plan);
     dispatch(&mut app, "/mode");
+    assert_eq!(app.mode, Mode::Nanoflow);
+    dispatch(&mut app, "/mode");
     assert_eq!(app.mode, Mode::Ask);
     dispatch(&mut app, "/mode nope");
     assert_eq!(app.mode, Mode::Ask);
@@ -117,6 +119,8 @@ fn mode_cycles_in_the_shift_tab_order() {
     assert_eq!(app.mode, Mode::Auto);
     assert_eq!(cycle_mode(&mut app), vec![Effect::SetMode(Mode::Plan)]);
     assert_eq!(app.mode, Mode::Plan);
+    assert_eq!(cycle_mode(&mut app), vec![Effect::SetMode(Mode::Nanoflow)]);
+    assert_eq!(app.mode, Mode::Nanoflow);
     assert_eq!(cycle_mode(&mut app), vec![Effect::SetMode(Mode::Ask)]);
     assert_eq!(app.mode, Mode::Ask);
 }
@@ -127,6 +131,7 @@ fn the_auto_warning_is_shown_only_once_per_session() {
     cycle_mode(&mut app); // auto
     assert!(app.toasts.iter().any(|toast| toast.text == AUTO_WARNING));
     cycle_mode(&mut app); // plan
+    cycle_mode(&mut app); // nanoflow
     cycle_mode(&mut app); // ask
     cycle_mode(&mut app); // auto again
     assert!(

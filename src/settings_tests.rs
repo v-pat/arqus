@@ -235,3 +235,13 @@ fn keybinds_accept_one_key_or_array_and_project_wins() {
         Some(vec!["alt+enter".to_string(), "ctrl+j".to_string()])
     );
 }
+
+#[test]
+fn approval_mode_deserializes_nanoflow_and_aliases() {
+    let mode: ApprovalMode = serde_json::from_str(r#""nanoflow""#).unwrap();
+    assert_eq!(mode, ApprovalMode::Nanoflow);
+    let mode: ApprovalMode = serde_json::from_str(r#""nanoflow(experimental)""#).unwrap();
+    assert_eq!(mode, ApprovalMode::Nanoflow);
+    let mode: ApprovalMode = serde_json::from_str(r#""flow""#).unwrap();
+    assert_eq!(mode, ApprovalMode::Nanoflow);
+}

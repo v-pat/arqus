@@ -32,11 +32,15 @@ pub fn resolve_mode(
             };
             Ok((approver, false))
         }
+        Some("nanoflow") | Some("nanoflow(experimental)") | Some("flow") => {
+            Ok((Approver::Auto, false))
+        }
         Some(other) => Err(format!(
-            "unknown mode '{other}': expected ask, auto, or plan"
+            "unknown mode '{other}': expected ask, auto, plan, or nanoflow"
         )),
         None => {
-            if yolo || settings.approval == Some(ApprovalMode::Auto) {
+            if is_nanoflow(None, settings) || yolo || settings.approval == Some(ApprovalMode::Auto)
+            {
                 Ok((Approver::Auto, false))
             } else if settings.approval == Some(ApprovalMode::Plan) {
                 let approver = if interactive {
@@ -51,6 +55,15 @@ pub fn resolve_mode(
                 Ok((Approver::DenyAll, false))
             }
         }
+    }
+}
+
+/// True if the mode flag or settings configure nanoflow mode.
+pub fn is_nanoflow(mode_flag: Option<&str>, settings: &Settings) -> bool {
+    match mode_flag.map(|s| s.trim().to_ascii_lowercase()).as_deref() {
+        Some("nanoflow") | Some("nanoflow(experimental)") | Some("flow") => true,
+        Some(_) => false,
+        None => settings.approval == Some(ApprovalMode::Nanoflow),
     }
 }
 
@@ -115,5 +128,29 @@ mod tests {
             resolve_mode(Some("ask"), false, &plan_settings, true).unwrap(),
             (Approver::Interactive, false)
         );
+        assert_eq!(
+            resolve_mode(Some("nanoflow"), false, &settings, true).unwrap(),
+            (Approver::Auto, false)
+        );
+        assert_eq!(
+            resolve_mode(Some("nanoflow(experimental)"), false, &settings, true).unwrap(),
+            (Approver::Auto, false)
+        );
+        assert_eq!(
+            resolve_mode(Some("flow"), false, &settings, true).unwrap(),
+            (Approver::Auto, false)
+        );
+
+        let nanoflow_settings = Settings {
+            approval: Some(ApprovalMode::Nanoflow),
+            ..Default::default()
+        };
+        assert_eq!(
+            resolve_mode(None, false, &nanoflow_settings, true).unwrap(),
+            (Approver::Auto, false)
+        );
+        assert!(is_nanoflow(Some("nanoflow"), &settings));
+        assert!(is_nanoflow(None, &nanoflow_settings));
+        assert!(!is_nanoflow(Some("ask"), &nanoflow_settings));
     }
 }

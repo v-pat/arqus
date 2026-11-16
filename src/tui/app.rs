@@ -86,10 +86,12 @@ pub struct App {
     pub model: String,
     /// Which provider the TUI is ready to talk to.
     pub provider_state: ProviderState,
-    /// Footer chip: ask, auto or plan.
+    /// Footer chip: ask, auto, plan or nanoflow.
     pub mode: Mode,
     /// True once the auto warning toast has been shown in this session.
     pub auto_warned: bool,
+    /// True once the nanoflow warning toast has been shown in this session.
+    pub nanoflow_warned: bool,
     /// Tick of the last key or paste, so the bell only rings after 10 idle seconds.
     pub last_input_tick: u64,
     /// Branch and dirty flag, when the project is a git repository.
@@ -165,6 +167,7 @@ impl App {
             provider_state: ProviderState::NeedsProvider,
             mode: Mode::Ask,
             auto_warned: false,
+            nanoflow_warned: false,
             last_input_tick: 0,
             git: None,
             toasts: VecDeque::new(),

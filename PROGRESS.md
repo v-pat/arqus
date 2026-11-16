@@ -1906,6 +1906,35 @@
 - Next stage:
   - Complete. All flow stages (F0 through F11) delivered.
 
+## Stage: Nanoflow Mode (`nanoflow(experimental)`) Integration   [DONE]
+- Files created or changed:
+  - `src/tui/facts.rs`: added `Mode::Nanoflow` variant, updated `chip()` to `"nanoflow(experimental)"`, `next()` cycling order (`Ask -> Auto -> Plan -> Nanoflow -> Ask`), and parser accepting `"nanoflow"`, `"nanoflow(experimental)"`, and `"flow"`.
+  - `src/tui/view.rs`: updated `border_color` to style the prompt border with `theme.success` (distinct green) when in nanoflow mode.
+  - `src/tui/commands.rs`: updated `/mode` command to toast `mode: nanoflow(experimental)` and show introductory notice on first switch.
+  - `src/tui/app.rs`: added `nanoflow_warned: bool` tracking first-use advisory toast.
+  - `src/tui/command_registry.rs`: updated mode command summary in help to `ask · auto · plan · nanoflow(experimental)`.
+  - `src/tui/overlay/settings.rs`: updated `DefaultMode` setting to cycle through all 4 modes including `nanoflow(experimental)`.
+  - `src/settings.rs`, `src/settings_tests.rs`: added `ApprovalMode::Nanoflow` with serde aliases (`nanoflow(experimental)`, `flow`) and tests.
+  - `src/safety_setup.rs`: updated `resolve_mode` and added `is_nanoflow` helper recognizing nanoflow mode across CLI and settings.
+  - `src/cli.rs`: updated `--mode` clap documentation to list nanoflow (experimental).
+  - `src/print.rs`: wired print mode (`-p`) to execute `crate::flow::cli::run(...)` with `RunArgs` when nanoflow mode is active.
+  - `src/tui/tasks.rs`, `src/tui/effects.rs`: added `spawn_nanoflow` to execute the collaborative multi-model flow on prompt input in TUI mode, streaming notices and recording assistant turns in the session history.
+  - `src/tui/footer_tests.rs`, `src/tui/commands_tests.rs`, `src/tui/update_tests.rs`, `src/tui/mode_tests.rs`, `tests/e2e_safety.rs`: updated test assertions and added test coverage for nanoflow mode.
+  - `tests/snapshots/`: generated snapshot `footer-mode-nanoflow(experimental)-80x1.txt`, updated `help-80x24.txt` and `slash-menu-80x24.txt`.
+  - `README.md`: documented `--mode nanoflow` in CLI options and interactive mode feature list.
+- What works (command + short real output):
+  - `cargo test --bin arqus` -> `test result: ok. 827 passed; 0 failed; finished in 1.85s`
+  - `cargo test --test e2e_safety` -> `test result: ok. 8 passed; 0 failed; finished in 0.68s`
+  - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
+  - `./scripts/test-audit-flow.sh` -> `Tests passed: 30, failed: 0. All audit-flow tests passed!`
+  - `./scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - The mode command and CLI flag accept `nanoflow`, `nanoflow(experimental)`, and `flow` case-insensitively, displaying `nanoflow(experimental)` in the UI chip and status lines.
+  - In `Nanoflow` mode, the prompt box border uses `theme.success` to provide a clear, distinct visual cue of collaborative multi-model orchestration.
+- Known problems / TODO:
+  - None. All unit tests, integration tests, and check scripts pass.
+
+
 
 
 

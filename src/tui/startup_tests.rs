@@ -87,6 +87,7 @@ fn dummy_startup(default_mode: Option<&str>, plan: bool, auto: bool) -> Startup 
             skills: Vec::new(),
         },
         provider: "openrouter".to_string(),
+        initial_mode: None,
         auto,
         connect_on_start: false,
         models_on_start: false,

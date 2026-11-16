@@ -143,6 +143,7 @@ async fn interactive_mode(cli: &Cli) -> anyhow::Result<()> {
         model_name,
     };
     let provider = model.provider.clone();
+    let initial_mode = cli.mode.as_deref().and_then(crate::tui::Mode::parse);
 
     tui::run(tui::Startup {
         runtime,
@@ -151,6 +152,7 @@ async fn interactive_mode(cli: &Cli) -> anyhow::Result<()> {
         cwd: cwd_str,
         resources,
         provider,
+        initial_mode,
         auto,
         connect_on_start,
         models_on_start,

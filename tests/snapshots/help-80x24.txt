@@ -11,7 +11,7 @@
   │ delete delete         end bottom            /copy Copy the last answer   │
   │ tab complete          ctrl+end bottom       /export Export the conversat…│
   │ left left             ? this help           /mcp List configured MCP ser…│
-  │ right right           ctrl+p palette        /mode ask · auto · plan      │
+  │ right right           ctrl+p palette        /mode ask · auto · plan · na…│
   │ alt+left word left    ctrl+l models         /models Pick a model         │
   │ alt+right word right  shift+tab cycle mode  /model Switch model: /model …│
   │ ctrl+a line start     f2 cycle model        /theme Change the theme      │

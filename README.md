@@ -179,9 +179,10 @@ Options:
       --model <PROVIDER:MODEL>
                             Pick provider and model, for example
                             anthropic:claude-sonnet-4
-      --mode <ask|auto|plan>
+      --mode <ask|auto|plan|nanoflow>
                             Execution mode: interactive approvals (ask),
-                            unattended tools (auto), or read-only (plan)
+                            unattended tools (auto), read-only (plan),
+                            or collaborative flow (nanoflow(experimental))
       --max-cost <DOLLARS>  Stop when one prompt costs more than this
       --max-session-cost <DOLLARS>
                             Stop when the whole session costs more than this
@@ -321,7 +322,7 @@ Flow includes two dedicated evaluation benchmarks:
 - **Clean Git repo required**: Flow branches from HEAD and refuses to start on a dirty repository.
 - **No automatic merging**: Completed runs leave commits on `arqus/flow/<run_id>`. The user reviews with `git diff` and merges manually.
 - **Deterministic verification only**: Task acceptance is strictly determined by command exit codes and scope checks; there is no LLM judge.
-- **No TUI integration**: Flow operates exclusively in CLI / print mode.
+- **Interactive Nanoflow Mode**: In addition to `arqus flow run`, flow can be activated directly via `--mode nanoflow` (displayed as `nanoflow(experimental)`), seamlessly accessible in the TUI (cycling with `Shift+Tab`, `/mode nanoflow`) or print mode (`-p`).
 - **No auto-repair for final verify**: If final repository-wide verification fails after all tasks pass, the run fails with exit code 1.
 
 ## Configuration

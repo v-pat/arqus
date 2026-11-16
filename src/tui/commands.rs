@@ -320,6 +320,8 @@ fn run_prompt(app: &mut App, text: &str) -> Vec<Effect> {
 
 pub const AUTO_WARNING: &str =
     "auto: tools run without asking. Use a git branch or the Docker sandbox.";
+pub const NANOFLOW_INFO: &str =
+    "nanoflow: collaborative multi-model planning and execution (experimental)";
 
 /// Switch mode and tell the engine. The choice is never written to state.json.
 fn mode_command(app: &mut App, args: &str) -> Vec<Effect> {
@@ -329,13 +331,13 @@ fn mode_command(app: &mut App, args: &str) -> Vec<Effect> {
     match Mode::parse(args) {
         Some(mode) => set_mode(app, mode),
         None => {
-            app.toast("mode: use ask, auto or plan", Level::Warn);
+            app.toast("mode: use ask, auto, plan, or nanoflow", Level::Warn);
             Vec::new()
         }
     }
 }
 
-/// Shift+Tab: ask -> auto -> plan -> ask.
+/// Shift+Tab: ask -> auto -> plan -> nanoflow -> ask.
 pub fn cycle_mode(app: &mut App) -> Vec<Effect> {
     set_mode(app, app.mode.next())
 }
@@ -347,6 +349,9 @@ pub fn set_mode(app: &mut App, mode: Mode) -> Vec<Effect> {
     if mode == Mode::Auto && !app.auto_warned {
         app.auto_warned = true;
         app.toast(AUTO_WARNING, Level::Warn);
+    } else if mode == Mode::Nanoflow && !app.nanoflow_warned {
+        app.nanoflow_warned = true;
+        app.toast(NANOFLOW_INFO, Level::Info);
     }
     vec![Effect::SetMode(mode)]
 }

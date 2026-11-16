@@ -61,7 +61,7 @@ fn done(blocks: Vec<MessageBlock>, stop: StopReason) -> StreamEvent {
 fn config(cwd: &Path, mode: Mode) -> AgentConfig {
     let approver = match mode {
         Mode::Ask | Mode::Plan => Approver::Interactive,
-        Mode::Auto => Approver::Auto,
+        Mode::Auto | Mode::Nanoflow => Approver::Auto,
     };
     AgentConfig {
         cwd: cwd.to_path_buf(),
@@ -291,5 +291,9 @@ fn mode_presentation_and_border_colors() {
     assert_eq!(
         (Mode::Plan.chip(), border_color(Mode::Plan, &theme)),
         ("plan", theme.accent)
+    );
+    assert_eq!(
+        (Mode::Nanoflow.chip(), border_color(Mode::Nanoflow, &theme)),
+        ("nanoflow(experimental)", theme.success)
     );
 }

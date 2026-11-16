@@ -49,7 +49,7 @@ fn footer_60_snapshot() {
 
 #[test]
 fn footer_mode_chip_snapshots() {
-    for mode in [Mode::Ask, Mode::Auto, Mode::Plan] {
+    for mode in [Mode::Ask, Mode::Auto, Mode::Plan, Mode::Nanoflow] {
         let mut app = demo();
         app.mode = mode;
         assert_snapshot(
@@ -100,10 +100,15 @@ fn cost_is_short_and_mode_chips_are_stable() {
     assert_eq!(Mode::Ask.chip(), "ask");
     assert_eq!(Mode::Auto.chip(), "auto");
     assert_eq!(Mode::Plan.chip(), "plan");
+    assert_eq!(Mode::Nanoflow.chip(), "nanoflow(experimental)");
     assert_eq!(Mode::Ask.next(), Mode::Auto);
     assert_eq!(Mode::Auto.next(), Mode::Plan);
-    assert_eq!(Mode::Plan.next(), Mode::Ask);
+    assert_eq!(Mode::Plan.next(), Mode::Nanoflow);
+    assert_eq!(Mode::Nanoflow.next(), Mode::Ask);
     assert_eq!(Mode::parse(" PLAN "), Some(Mode::Plan));
+    assert_eq!(Mode::parse("nanoflow"), Some(Mode::Nanoflow));
+    assert_eq!(Mode::parse("nanoflow(experimental)"), Some(Mode::Nanoflow));
+    assert_eq!(Mode::parse("flow"), Some(Mode::Nanoflow));
     assert_eq!(Mode::parse("nope"), None);
 }
 
