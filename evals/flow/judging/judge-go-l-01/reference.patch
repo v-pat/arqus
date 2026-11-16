@@ -1,0 +1,11 @@
+--- a/collector.go
++++ b/collector.go
+@@ -1,4 +1,7 @@
+ package judge
+ 
+ type Collector struct { Sinks []Sink }
+-func (c *Collector) Emit(m Metric) {}
++func (c *Collector) AddSink(s Sink) { c.Sinks = append(c.Sinks, s) }
++func (c *Collector) Emit(m Metric) {
++    for _, s := range c.Sinks { s.Write(m) }
++}

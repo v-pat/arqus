@@ -1,0 +1,6 @@
+--- a/gcd.py
++++ b/gcd.py
+@@ -1 +1,2 @@
+-def gcd(a, b): pass
++import math
++def gcd(a, b): return math.gcd(a, b)

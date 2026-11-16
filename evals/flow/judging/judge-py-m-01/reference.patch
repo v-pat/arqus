@@ -1,0 +1,18 @@
+--- a/rate_limit.py
++++ b/rate_limit.py
+@@ -1,9 +1,13 @@
+ import time
+ 
++class SystemClock:
++    def now(self) -> float: return time.time()
++
+ class TokenBucket:
+-    def __init__(self, rate: float):
++    def __init__(self, rate: float, clock=None):
+         self.rate = rate
+         self.tokens = rate
+-        self.last = time.time()
++        self.clock = clock or SystemClock()
++        self.last = self.clock.now()
+     def consume(self) -> bool:
+         return True

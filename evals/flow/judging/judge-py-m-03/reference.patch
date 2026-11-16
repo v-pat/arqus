@@ -1,0 +1,15 @@
+--- a/matrix_ops.py
++++ b/matrix_ops.py
+@@ -1,2 +1,11 @@
+-def dot_product(v1, v2):
++def dot_product(v1: list[float], v2: list[float]) -> float:
++    """Compute the dot product of two vectors.
++
++    Args:
++        v1: First vector of numbers.
++        v2: Second vector of numbers.
++
++    Returns:
++        The scalar dot product.
++    """
+     return sum(x * y for x, y in zip(v1, v2))

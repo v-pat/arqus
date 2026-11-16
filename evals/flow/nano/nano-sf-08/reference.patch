@@ -1,0 +1,5 @@
+--- a/char_fn.py
++++ b/char_fn.py
+@@ -1 +1 @@
+-def is_vowel(c): pass
++def is_vowel(c): return c.lower() in 'aeiou'

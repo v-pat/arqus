@@ -1,0 +1,22 @@
+{
+  "name": "judge-rs-l-01",
+  "language": "rust",
+  "size": "L",
+  "category": "multi_file",
+  "repo": "setup",
+  "objective": "Implement plugin registry across src/plugin.rs, src/registry.rs, and src/lib.rs",
+  "public_verify": [
+    "cargo test --test test_pub"
+  ],
+  "hidden_verify": [
+    "cargo test --test test_hid"
+  ],
+  "regression_verify": [
+    "cargo test --test test_reg"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

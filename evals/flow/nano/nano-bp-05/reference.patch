@@ -1,0 +1,6 @@
+--- a/config.py
++++ b/config.py
+@@ -1,2 +1,3 @@
+ class Config:
+     def __init__(self, host, port): self.host = host; self.port = port
++    def copy(self): return Config(self.host, self.port)

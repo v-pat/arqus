@@ -1,0 +1,9 @@
+--- a/store.go
++++ b/store.go
+@@ -4,4 +4,5 @@
+ 
+ type MemStore struct { m map[string]string }
+ func NewMemStore() *MemStore { return &MemStore{m: make(map[string]string)} }
+-func (s *MemStore) Get(k string) string { return "" }
++func (s *MemStore) Get(k string) string { return s.m[k] }
++func (s *MemStore) Set(k, v string) { s.m[k] = v }

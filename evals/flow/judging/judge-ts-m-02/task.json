@@ -1,0 +1,22 @@
+{
+  "name": "judge-ts-m-02",
+  "language": "typescript",
+  "size": "M",
+  "category": "tests",
+  "repo": "setup",
+  "objective": "Add test cases for isHttpError in test_errors.ts",
+  "public_verify": [
+    "node --experimental-strip-types test_pub.ts"
+  ],
+  "hidden_verify": [
+    "node --experimental-strip-types test_hid.ts"
+  ],
+  "regression_verify": [
+    "node --experimental-strip-types test_reg.ts"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

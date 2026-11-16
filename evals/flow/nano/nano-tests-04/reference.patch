@@ -1,0 +1,5 @@
+--- a/test_div.py
++++ b/test_div.py
+@@ -1 +1 @@
+-# TODO
++def test_div(): assert 12 / 3 == 4

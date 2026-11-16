@@ -1,0 +1,22 @@
+{
+  "name": "judge-rs-m-03",
+  "language": "rust",
+  "size": "M",
+  "category": "docs",
+  "repo": "setup",
+  "objective": "Implement normalize vector function in src/lib.rs",
+  "public_verify": [
+    "cargo test --test test_pub"
+  ],
+  "hidden_verify": [
+    "cargo test --test test_hid"
+  ],
+  "regression_verify": [
+    "cargo test --test test_reg"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

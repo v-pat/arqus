@@ -1,0 +1,10 @@
+--- a/test_query.py
++++ b/test_query.py
+@@ -1,2 +1,6 @@
+ import query_builder
+-# TODO: add tests
++def test_multiple_params():
++    res = query_builder.build_query({'b': '2', 'a': '1'})
++    assert res == 'a=1&b=2'
++def test_empty():
++    assert query_builder.build_query({}) == ''

@@ -1,0 +1,22 @@
+{
+  "name": "judge-go-m-02",
+  "language": "go",
+  "size": "M",
+  "category": "tests",
+  "repo": "setup",
+  "objective": "Implement wildcard pattern matching in router.go",
+  "public_verify": [
+    "go test -run TestPub ."
+  ],
+  "hidden_verify": [
+    "go test -run TestHid ."
+  ],
+  "regression_verify": [
+    "go test -run TestReg ."
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

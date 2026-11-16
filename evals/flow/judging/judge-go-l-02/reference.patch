@@ -1,0 +1,11 @@
+--- a/pool.go
++++ b/pool.go
+@@ -1,4 +1,7 @@
+ package judge
+ 
+ type Pool struct { Q *Queue }
+-func (p *Pool) ProcessNext() bool { return false }
++func (p *Pool) ProcessNext() bool {
++    _, ok := p.Q.Pop()
++    return ok
++}

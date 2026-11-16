@@ -1,0 +1,22 @@
+{
+  "name": "judge-ts-s-01",
+  "language": "typescript",
+  "size": "S",
+  "category": "single_function",
+  "repo": "setup",
+  "objective": "Implement slugify in slug.ts",
+  "public_verify": [
+    "node --experimental-strip-types test_pub.ts"
+  ],
+  "hidden_verify": [
+    "node --experimental-strip-types test_hid.ts"
+  ],
+  "regression_verify": [
+    "node --experimental-strip-types test_reg.ts"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

@@ -1,0 +1,23 @@
+{
+  "name": "nano-docs-07",
+  "category": "docs",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-docs-07",
+    "objective": "Add docstring to reverse_str in rev.py",
+    "category": "docs",
+    "context_files": [
+      "rev.py"
+    ],
+    "allowed_writes": [
+      "rev.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

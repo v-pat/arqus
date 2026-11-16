@@ -1,0 +1,22 @@
+{
+  "name": "judge-py-l-02",
+  "language": "python",
+  "size": "L",
+  "category": "multi_file",
+  "repo": "setup",
+  "objective": "Implement tier-based caching across cache.py, backend.py, and policy.py",
+  "public_verify": [
+    "python3 test_pub.py"
+  ],
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "regression_verify": [
+    "python3 test_reg.py"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

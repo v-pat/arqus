@@ -1,0 +1,23 @@
+{
+  "name": "nano-bf-04",
+  "category": "local_bugfix",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-bf-04",
+    "objective": "Fix key error in get_name in user_dict.py",
+    "category": "local_bugfix",
+    "context_files": [
+      "user_dict.py"
+    ],
+    "allowed_writes": [
+      "user_dict.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

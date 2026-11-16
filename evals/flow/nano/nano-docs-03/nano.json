@@ -1,0 +1,23 @@
+{
+  "name": "nano-docs-03",
+  "category": "docs",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-docs-03",
+    "objective": "Add module docstring to mod.py",
+    "category": "docs",
+    "context_files": [
+      "mod.py"
+    ],
+    "allowed_writes": [
+      "mod.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

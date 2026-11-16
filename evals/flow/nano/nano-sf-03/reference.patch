@@ -1,0 +1,5 @@
+--- a/text_fn.py
++++ b/text_fn.py
+@@ -1 +1 @@
+-def capitalize_words(s): pass
++def capitalize_words(s): return ' '.join(w.capitalize() for w in s.split())

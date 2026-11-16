@@ -1,0 +1,9 @@
+--- a/router.go
++++ b/router.go
+@@ -1,5 +1,5 @@
+ package judge
+ 
+ func MatchRoute(pattern, path string) bool {
+-    return pattern == path
++    return pattern == path || pattern == "*"
+ }

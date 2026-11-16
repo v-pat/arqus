@@ -1,0 +1,23 @@
+{
+  "name": "nano-bf-06",
+  "category": "local_bugfix",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-bf-06",
+    "objective": "Fix off-by-one in in_bounds in bounds.py",
+    "category": "local_bugfix",
+    "context_files": [
+      "bounds.py"
+    ],
+    "allowed_writes": [
+      "bounds.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

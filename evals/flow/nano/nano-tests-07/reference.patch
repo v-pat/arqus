@@ -1,0 +1,5 @@
+--- a/test_split.py
++++ b/test_split.py
+@@ -1 +1 @@
+-# TODO
++def test_split(): assert 'a,b'.split(',') == ['a', 'b']

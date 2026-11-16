@@ -1,0 +1,8 @@
+--- a/trans.py
++++ b/trans.py
+@@ -1,4 +1,2 @@
+ def square_all(nums):
+-    res = []
+-    for n in nums: res.append(n * n)
+-    return res
++    return [n * n for n in nums]

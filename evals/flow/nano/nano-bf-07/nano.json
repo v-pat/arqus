@@ -1,0 +1,23 @@
+{
+  "name": "nano-bf-07",
+  "category": "local_bugfix",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-bf-07",
+    "objective": "Fix mutable default argument in append_item in mut.py",
+    "category": "local_bugfix",
+    "context_files": [
+      "mut.py"
+    ],
+    "allowed_writes": [
+      "mut.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

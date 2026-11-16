@@ -1,0 +1,11 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1 +1,7 @@
+-pub fn is_prime(_n: u64) -> bool { false }
++pub fn is_prime(n: u64) -> bool {
++    if n < 2 { return false; }
++    for i in 2..=((n as f64).sqrt() as u64) {
++        if n % i == 0 { return false; }
++    }
++    true
++}

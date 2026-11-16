@@ -1,0 +1,9 @@
+--- a/src/registry.rs
++++ b/src/registry.rs
+@@ -2,5 +2,6 @@
+ pub struct Registry { pub plugins: Vec<Box<dyn Plugin>> }
+ impl Registry {
+     pub fn new() -> Self { Self { plugins: Vec::new() } }
++    pub fn register(&mut self, p: Box<dyn Plugin>) { self.plugins.push(p); }
+     pub fn len(&self) -> usize { self.plugins.len() }
+ }

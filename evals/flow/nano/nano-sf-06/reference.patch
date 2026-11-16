@@ -1,0 +1,5 @@
+--- a/str_fn.py
++++ b/str_fn.py
+@@ -1 +1 @@
+-def repeat_str(s, n): pass
++def repeat_str(s, n): return s * n

@@ -1,0 +1,8 @@
+--- a/min_util.py
++++ b/min_util.py
+@@ -1,4 +1,2 @@
+ def min_two(a, b):
+-    if a < b:
+-        return a
+-    return b
++    return min(a, b)

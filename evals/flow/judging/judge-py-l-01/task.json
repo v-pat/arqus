@@ -1,0 +1,22 @@
+{
+  "name": "judge-py-l-01",
+  "language": "python",
+  "size": "L",
+  "category": "multi_file",
+  "repo": "setup",
+  "objective": "Implement event logging middleware across events.py, handlers.py, and bus.py",
+  "public_verify": [
+    "python3 test_pub.py"
+  ],
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "regression_verify": [
+    "python3 test_reg.py"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

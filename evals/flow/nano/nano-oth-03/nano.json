@@ -1,0 +1,23 @@
+{
+  "name": "nano-oth-03",
+  "category": "other",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-oth-03",
+    "objective": "Update max retries in retry.py",
+    "category": "other",
+    "context_files": [
+      "retry.py"
+    ],
+    "allowed_writes": [
+      "retry.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

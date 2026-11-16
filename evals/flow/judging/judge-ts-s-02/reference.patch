@@ -1,0 +1,11 @@
+--- a/clone.ts
++++ b/clone.ts
+@@ -1,6 +1,7 @@
+ export function deepClone<T>(obj: T): T {
+     if (obj === null || typeof obj !== 'object') return obj;
+-    const copy: any = {}; // bug: turns arrays into {}
++    if (Array.isArray(obj)) return obj.map(deepClone) as any;
++    const copy: any = {};
+     for (const key of Object.keys(obj)) {
+         copy[key] = deepClone((obj as any)[key]);
+     }

@@ -1,0 +1,8 @@
+--- a/joiner.py
++++ b/joiner.py
+@@ -1,4 +1,2 @@
+ def join_words(words):
+-    res = ''
+-    for w in words: res += w + ' '
+-    return res.strip()
++    return ' '.join(words)

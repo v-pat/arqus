@@ -1,0 +1,22 @@
+{
+  "name": "judge-py-m-01",
+  "language": "python",
+  "size": "M",
+  "category": "local_refactor",
+  "repo": "setup",
+  "objective": "Refactor TokenBucket in rate_limit.py to take an optional Clock object",
+  "public_verify": [
+    "python3 test_pub.py"
+  ],
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "regression_verify": [
+    "python3 test_reg.py"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

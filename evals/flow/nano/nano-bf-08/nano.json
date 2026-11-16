@@ -1,0 +1,23 @@
+{
+  "name": "nano-bf-08",
+  "category": "local_bugfix",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-bf-08",
+    "objective": "Fix float precision in is_close in math_cmp.py",
+    "category": "local_bugfix",
+    "context_files": [
+      "math_cmp.py"
+    ],
+    "allowed_writes": [
+      "math_cmp.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

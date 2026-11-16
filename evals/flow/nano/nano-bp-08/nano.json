@@ -1,0 +1,23 @@
+{
+  "name": "nano-bp-08",
+  "category": "boilerplate",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-bp-08",
+    "objective": "Implement iter on Queue in queue.py",
+    "category": "boilerplate",
+    "context_files": [
+      "queue.py"
+    ],
+    "allowed_writes": [
+      "queue.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

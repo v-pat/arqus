@@ -1,0 +1,23 @@
+{
+  "name": "nano-oth-04",
+  "category": "other",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-oth-04",
+    "objective": "Toggle feature flag in flags.py",
+    "category": "other",
+    "context_files": [
+      "flags.py"
+    ],
+    "allowed_writes": [
+      "flags.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

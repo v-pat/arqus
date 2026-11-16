@@ -1,0 +1,10 @@
+--- a/api.ts
++++ b/api.ts
+@@ -1,3 +1,5 @@
+-export function loadData(id: string, cb: (res: string) => void): void {
+-    cb(`data-${id}`);
++export function loadData(id: string, cb?: (res: string) => void): Promise<string> {
++    const val = `data-${id}`;
++    if (cb) cb(val);
++    return Promise.resolve(val);
+ }

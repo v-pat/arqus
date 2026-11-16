@@ -1,0 +1,12 @@
+--- a/reducer.ts
++++ b/reducer.ts
+@@ -1,2 +1,8 @@
+ import type { Action } from './actions.ts';
+-export function reducer(state: number, action: Action): number { return state; }
++export function reducer(state: number, action: Action): number {
++    switch (action.type) {
++        case 'INCREMENT': return state + 1;
++        case 'DECREMENT': return state - 1;
++        default: return state;
++    }
++}

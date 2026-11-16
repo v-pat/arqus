@@ -1877,6 +1877,35 @@
 - Next stage:
   - Stage F11: Live shakedown and first eval.
 
+## Stage F11: Live shakedown and first eval   [DONE]
+- Files created or changed:
+  - `evals/flow_validity.py`: additively added `validate_nano_task` checking clean repository, contract schemas, reference patch application, and `hidden_verify` failure before / success after.
+  - `evals/generate_task_sets.py`: task fixture generator and patch synthesizer for test suites.
+  - `evals/create_judging_set.py`: generated the complete 30-task judging set across Rust, Python, Go, and TypeScript.
+  - `evals/create_nano_set.py`: generated the complete 60-contract nano evaluation set across 8 categories.
+  - `evals/flow/judging/`: 30 judging tasks (10 S, 12 M, 8 L; 8 Python, 8 Rust, 7 Go, 7 TypeScript), each with `task.json`, git `setup/`, `hidden/`, and `reference.patch`.
+  - `evals/flow/judging/holdout.json`: recorded 6 held-out task IDs (`judge-py-s-03`, `judge-py-l-02`, `judge-rs-s-03`, `judge-go-m-03`, `judge-ts-m-03`, `judge-ts-l-02`).
+  - `evals/flow/nano/`: 60 nano tasks (8 boilerplate, 8 single_function, 8 tests, 8 docs, 8 local_refactor, 8 local_bugfix, 8 multi_file, 4 other), each with `nano.json`, git `setup/`, and `reference.patch`.
+  - `evals/flow_run_nano.py`: runner for nano contract evaluations with worker model evaluation, stats aggregation per category, and append to `stats.jsonl`.
+  - `scripts/run-flow-nano.sh`: automation script for nano evaluations and capability profile updates.
+  - `evals/tests/test_judging_set.py`: validation test suite verifying 30 tasks, size and language distributions, 6 holdouts, and 100% pass on validity checks.
+  - `evals/tests/test_nano_set.py`: validation test suite verifying 60 contracts, >= 8 per delegable category, valid contract schemas, and 100% pass on contract validity checks.
+  - `evals/tests/test_flow_run_nano.py`: tests verifying nano evaluation runner dry-run execution, stats recording, and profile builder integration.
+- What works (command + short real output):
+  - `python3 -m unittest evals/tests/test_judging_set.py` -> `Ran 5 tests in 37.125s; OK`
+  - `python3 -m unittest evals/tests/test_nano_set.py` -> `Ran 4 tests in 5.866s; OK`
+  - `python3 -m unittest evals/tests/test_flow_run_nano.py` -> `Ran 2 tests in 0.467s; OK`
+  - `python3 -m unittest discover -s evals/tests -p "test_*.py"` -> `Ran 53 tests in 45.821s; OK`
+  - `./scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - In Go and TypeScript fixtures, interface assertions and typed imports were utilized so that regression tests and public tests compile and execute cleanly in strict compilers prior to patch application.
+  - The 30-task judging set includes 6 designated holdouts (2 S, 2 M, 2 L across all four supported languages) as prescribed by TESTS.md B4.
+  - The 60-contract nano set provides at least 8 contracts per delegable category (`boilerplate`, `single_function`, `tests`, `docs`, `local_refactor`, `local_bugfix`, `multi_file`) and 4 contracts for `other`.
+- Known problems / TODO:
+  - None. Ready for live model evaluation runs.
+- Next stage:
+  - Complete. All flow stages (F0 through F11) delivered.
+
 
 
 

@@ -1,0 +1,22 @@
+{
+  "name": "judge-py-s-02",
+  "language": "python",
+  "size": "S",
+  "category": "local_bugfix",
+  "repo": "setup",
+  "objective": "Fix calc_discount in billing.py to reject None and negative percentages with ValueError",
+  "public_verify": [
+    "python3 test_pub.py"
+  ],
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "regression_verify": [
+    "python3 test_reg.py"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

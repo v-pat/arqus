@@ -1,0 +1,9 @@
+--- a/filt.py
++++ b/filt.py
+@@ -1,5 +1,2 @@
+ def filter_pos(nums):
+-    res = []
+-    for n in nums:
+-        if n > 0: res.append(n)
+-    return res
++    return [n for n in nums if n > 0]

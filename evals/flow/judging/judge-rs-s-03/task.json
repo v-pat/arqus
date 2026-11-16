@@ -1,0 +1,22 @@
+{
+  "name": "judge-rs-s-03",
+  "language": "rust",
+  "size": "S",
+  "category": "tests",
+  "repo": "setup",
+  "objective": "Implement validate_username in src/lib.rs rejecting non-alphanumeric chars",
+  "public_verify": [
+    "cargo test --test test_pub"
+  ],
+  "hidden_verify": [
+    "cargo test --test test_hid"
+  ],
+  "regression_verify": [
+    "cargo test --test test_reg"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

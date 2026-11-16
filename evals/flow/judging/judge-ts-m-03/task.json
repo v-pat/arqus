@@ -1,0 +1,22 @@
+{
+  "name": "judge-ts-m-03",
+  "language": "typescript",
+  "size": "M",
+  "category": "docs",
+  "repo": "setup",
+  "objective": "Export VectorIdentifier and add Vector interface in math.ts",
+  "public_verify": [
+    "node --experimental-strip-types test_pub.ts"
+  ],
+  "hidden_verify": [
+    "node --experimental-strip-types test_hid.ts"
+  ],
+  "regression_verify": [
+    "node --experimental-strip-types test_reg.ts"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

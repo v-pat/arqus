@@ -1,0 +1,17 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,6 +1,12 @@
+ #[derive(Debug, PartialEq, Eq, Clone)]
+-pub enum Token { Word(String) }
++pub enum Token {
++    Word(String),
++    Number(i64),
++}
+ 
+ pub fn parse_tokens(s: &str) -> Vec<Token> {
+-    s.split_whitespace().map(|x| Token::Word(x.to_string())).collect()
++    s.split_whitespace().map(|x| {
++        if let Ok(n) = x.parse::<i64>() { Token::Number(n) }
++        else { Token::Word(x.to_string()) }
++    }).collect()
+ }

@@ -1,0 +1,23 @@
+{
+  "name": "nano-bf-05",
+  "category": "local_bugfix",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-bf-05",
+    "objective": "Fix NoneTypeError in str_len in string_ops.py",
+    "category": "local_bugfix",
+    "context_files": [
+      "string_ops.py"
+    ],
+    "allowed_writes": [
+      "string_ops.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

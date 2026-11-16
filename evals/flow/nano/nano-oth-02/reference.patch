@@ -1,0 +1,5 @@
+--- a/ver.py
++++ b/ver.py
+@@ -1 +1 @@
+-VERSION = '0.1.0'
++VERSION = '1.0.0'

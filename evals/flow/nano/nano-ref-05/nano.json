@@ -1,0 +1,23 @@
+{
+  "name": "nano-ref-05",
+  "category": "local_refactor",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-ref-05",
+    "objective": "Refactor max_two using max built-in in max_util.py",
+    "category": "local_refactor",
+    "context_files": [
+      "max_util.py"
+    ],
+    "allowed_writes": [
+      "max_util.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

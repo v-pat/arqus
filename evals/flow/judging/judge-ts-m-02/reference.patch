@@ -1,0 +1,11 @@
+--- a/test_errors.ts
++++ b/test_errors.ts
+@@ -1 +1,7 @@
+-// TODO: tests
++import { isHttpError } from "./errors.ts";
++export function testServerErrors(): void {
++    if (!isHttpError(500) || !isHttpError(503)) process.exit(1);
++}
++export function testClientErrors(): void {
++    if (!isHttpError(400) || !isHttpError(401)) process.exit(1);
++}

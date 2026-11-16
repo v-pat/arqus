@@ -1,0 +1,5 @@
+--- a/diff.py
++++ b/diff.py
+@@ -1 +1 @@
+-def abs_diff(a, b): pass
++def abs_diff(a, b): return abs(a - b)

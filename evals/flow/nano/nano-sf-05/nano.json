@@ -1,0 +1,23 @@
+{
+  "name": "nano-sf-05",
+  "category": "single_function",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-sf-05",
+    "objective": "Implement sum_positive(lst)",
+    "category": "single_function",
+    "context_files": [
+      "list_fn.py"
+    ],
+    "allowed_writes": [
+      "list_fn.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

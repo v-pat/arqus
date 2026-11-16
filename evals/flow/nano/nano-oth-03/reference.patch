@@ -1,0 +1,5 @@
+--- a/retry.py
++++ b/retry.py
+@@ -1 +1 @@
+-MAX_RETRIES = 3
++MAX_RETRIES = 5

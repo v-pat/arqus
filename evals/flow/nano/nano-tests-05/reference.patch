@@ -1,0 +1,5 @@
+--- a/test_str.py
++++ b/test_str.py
+@@ -1 +1 @@
+-# TODO
++def test_upper(): assert 'abc'.upper() == 'ABC'

@@ -1,0 +1,22 @@
+{
+  "name": "judge-go-l-01",
+  "language": "go",
+  "size": "L",
+  "category": "multi_file",
+  "repo": "setup",
+  "objective": "Implement metrics pipeline across metrics.go, collector.go, and sink.go",
+  "public_verify": [
+    "go test -run TestPub ."
+  ],
+  "hidden_verify": [
+    "go test -run TestHid ."
+  ],
+  "regression_verify": [
+    "go test -run TestReg ."
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

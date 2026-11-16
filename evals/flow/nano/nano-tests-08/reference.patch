@@ -1,0 +1,5 @@
+--- a/test_join.py
++++ b/test_join.py
+@@ -1 +1 @@
+-# TODO
++def test_join(): assert '-'.join(['x', 'y']) == 'x-y'

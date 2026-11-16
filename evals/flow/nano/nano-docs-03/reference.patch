@@ -1,0 +1,5 @@
+--- a/mod.py
++++ b/mod.py
+@@ -1 +1,2 @@
++"""Module utilities."""
+ x = 1

@@ -1,0 +1,22 @@
+{
+  "name": "judge-rs-l-02",
+  "language": "rust",
+  "size": "L",
+  "category": "other",
+  "repo": "setup",
+  "objective": "Implement step runner across src/context.rs, src/pipeline.rs, and src/lib.rs",
+  "public_verify": [
+    "cargo test --test test_pub"
+  ],
+  "hidden_verify": [
+    "cargo test --test test_hid"
+  ],
+  "regression_verify": [
+    "cargo test --test test_reg"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

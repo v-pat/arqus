@@ -1,0 +1,22 @@
+{
+  "name": "judge-ts-s-02",
+  "language": "typescript",
+  "size": "S",
+  "category": "local_bugfix",
+  "repo": "setup",
+  "objective": "Fix deepClone in clone.ts to preserve Arrays as Arrays instead of Objects",
+  "public_verify": [
+    "node --experimental-strip-types test_pub.ts"
+  ],
+  "hidden_verify": [
+    "node --experimental-strip-types test_hid.ts"
+  ],
+  "regression_verify": [
+    "node --experimental-strip-types test_reg.ts"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

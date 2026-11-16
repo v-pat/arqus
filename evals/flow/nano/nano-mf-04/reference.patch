@@ -1,0 +1,15 @@
+--- a/service_4.py
++++ b/service_4.py
+@@ -1,2 +1,2 @@
+ class Service:
+-    def call(self): return 'old'
++    def call(self): return 'updated'
+
+--- a/client_4.py
++++ b/client_4.py
+@@ -1,3 +1,4 @@
+ from service_4 import Service
+ class Client:
+-    def run(self): return 'unconfigured'
++    def run(self):
++        return Service().call()

@@ -1,0 +1,8 @@
+--- a/checker.py
++++ b/checker.py
+@@ -1,4 +1,2 @@
+ def check_all(flags):
+-    for f in flags:
+-        if not f: return False
+-    return True
++    return all(flags)

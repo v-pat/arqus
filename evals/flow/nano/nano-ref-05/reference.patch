@@ -1,0 +1,8 @@
+--- a/max_util.py
++++ b/max_util.py
+@@ -1,4 +1,2 @@
+ def max_two(a, b):
+-    if a > b:
+-        return a
+-    return b
++    return max(a, b)

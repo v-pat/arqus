@@ -1,0 +1,11 @@
+--- a/src/pipeline.rs
++++ b/src/pipeline.rs
+@@ -1,5 +1,7 @@
+ use crate::context::Context;
+ pub struct Pipeline;
+ impl Pipeline {
+-    pub fn run(_ctx: &mut Context) {}
++    pub fn run(ctx: &mut Context) {
++        ctx.step_count += 1;
++    }
+ }

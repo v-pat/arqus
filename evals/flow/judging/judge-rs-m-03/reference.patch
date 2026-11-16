@@ -1,0 +1,8 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1 +1,4 @@
+-pub fn normalize(_x: f64, _y: f64) -> (f64, f64) { (0.0, 0.0) }
++pub fn normalize(x: f64, y: f64) -> (f64, f64) {
++    let mag = (x * x + y * y).sqrt();
++    if mag == 0.0 { (0.0, 0.0) } else { (x / mag, y / mag) }
++}

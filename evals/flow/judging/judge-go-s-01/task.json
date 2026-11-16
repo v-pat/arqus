@@ -1,0 +1,22 @@
+{
+  "name": "judge-go-s-01",
+  "language": "go",
+  "size": "S",
+  "category": "single_function",
+  "repo": "setup",
+  "objective": "Implement CountWords(s string) map[string]int in words.go",
+  "public_verify": [
+    "go test -run TestPub ."
+  ],
+  "hidden_verify": [
+    "go test -run TestHid ."
+  ],
+  "regression_verify": [
+    "go test -run TestReg ."
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

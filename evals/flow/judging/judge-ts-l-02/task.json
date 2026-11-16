@@ -1,0 +1,22 @@
+{
+  "name": "judge-ts-l-02",
+  "language": "typescript",
+  "size": "L",
+  "category": "multi_file",
+  "repo": "setup",
+  "objective": "Implement validation pipeline across schema.ts, rules.ts, and validator.ts",
+  "public_verify": [
+    "node --experimental-strip-types test_pub.ts"
+  ],
+  "hidden_verify": [
+    "node --experimental-strip-types test_hid.ts"
+  ],
+  "regression_verify": [
+    "node --experimental-strip-types test_reg.ts"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

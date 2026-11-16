@@ -1,0 +1,6 @@
+--- a/bounds.py
++++ b/bounds.py
+@@ -1,2 +1,2 @@
+ def in_bounds(x, low, high):
+-    return low < x < high
++    return low <= x <= high

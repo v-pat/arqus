@@ -1,0 +1,23 @@
+{
+  "name": "nano-ref-07",
+  "category": "local_refactor",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-ref-07",
+    "objective": "Refactor count_items using len in counter.py",
+    "category": "local_refactor",
+    "context_files": [
+      "counter.py"
+    ],
+    "allowed_writes": [
+      "counter.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

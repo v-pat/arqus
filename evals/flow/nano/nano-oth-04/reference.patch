@@ -1,0 +1,5 @@
+--- a/flags.py
++++ b/flags.py
+@@ -1 +1 @@
+-ENABLE_METRICS = False
++ENABLE_METRICS = True

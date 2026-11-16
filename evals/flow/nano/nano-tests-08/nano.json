@@ -1,0 +1,23 @@
+{
+  "name": "nano-tests-08",
+  "category": "tests",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-tests-08",
+    "objective": "Add test_join in test_join.py",
+    "category": "tests",
+    "context_files": [
+      "test_join.py"
+    ],
+    "allowed_writes": [
+      "test_join.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

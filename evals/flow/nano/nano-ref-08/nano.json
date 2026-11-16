@@ -1,0 +1,23 @@
+{
+  "name": "nano-ref-08",
+  "category": "local_refactor",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-ref-08",
+    "objective": "Refactor check_all using all() in checker.py",
+    "category": "local_refactor",
+    "context_files": [
+      "checker.py"
+    ],
+    "allowed_writes": [
+      "checker.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

@@ -1,0 +1,23 @@
+{
+  "name": "nano-ref-01",
+  "category": "local_refactor",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-ref-01",
+    "objective": "Refactor square_all using list comprehension in trans.py",
+    "category": "local_refactor",
+    "context_files": [
+      "trans.py"
+    ],
+    "allowed_writes": [
+      "trans.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

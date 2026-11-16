@@ -1,0 +1,5 @@
+--- a/list_fn.py
++++ b/list_fn.py
+@@ -1 +1 @@
+-def sum_positive(lst): pass
++def sum_positive(lst): return sum(x for x in lst if x > 0)

@@ -1,0 +1,23 @@
+{
+  "name": "nano-bp-02",
+  "category": "boilerplate",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-bp-02",
+    "objective": "Implement repr on Color in color.py",
+    "category": "boilerplate",
+    "context_files": [
+      "color.py"
+    ],
+    "allowed_writes": [
+      "color.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

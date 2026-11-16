@@ -1,0 +1,23 @@
+{
+  "name": "nano-bp-01",
+  "category": "boilerplate",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-bp-01",
+    "objective": "Implement to_dict on Point in geom.py",
+    "category": "boilerplate",
+    "context_files": [
+      "geom.py"
+    ],
+    "allowed_writes": [
+      "geom.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

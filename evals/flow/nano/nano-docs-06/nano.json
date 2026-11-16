@@ -1,0 +1,23 @@
+{
+  "name": "nano-docs-06",
+  "category": "docs",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-docs-06",
+    "objective": "Add docstring to factorial in fact.py",
+    "category": "docs",
+    "context_files": [
+      "fact.py"
+    ],
+    "allowed_writes": [
+      "fact.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

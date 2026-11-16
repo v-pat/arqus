@@ -1,0 +1,23 @@
+{
+  "name": "nano-oth-02",
+  "category": "other",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-oth-02",
+    "objective": "Set app version in ver.py",
+    "category": "other",
+    "context_files": [
+      "ver.py"
+    ],
+    "allowed_writes": [
+      "ver.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

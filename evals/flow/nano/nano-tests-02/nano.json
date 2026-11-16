@@ -1,0 +1,23 @@
+{
+  "name": "nano-tests-02",
+  "category": "tests",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-tests-02",
+    "objective": "Add test_mul in test_mul.py",
+    "category": "tests",
+    "context_files": [
+      "test_mul.py"
+    ],
+    "allowed_writes": [
+      "test_mul.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

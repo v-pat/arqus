@@ -1,0 +1,6 @@
+--- a/queue.py
++++ b/queue.py
+@@ -1,2 +1,3 @@
+ class Queue:
+     def __init__(self): self.q = [1, 2, 3]
++    def __iter__(self): return iter(self.q)

@@ -1,0 +1,22 @@
+{
+  "name": "judge-ts-m-01",
+  "language": "typescript",
+  "size": "M",
+  "category": "local_refactor",
+  "repo": "setup",
+  "objective": "Refactor loadData in api.ts to return a Promise instead of taking a callback",
+  "public_verify": [
+    "node --experimental-strip-types test_pub.ts"
+  ],
+  "hidden_verify": [
+    "node --experimental-strip-types test_hid.ts"
+  ],
+  "regression_verify": [
+    "node --experimental-strip-types test_reg.ts"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

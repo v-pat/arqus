@@ -1,0 +1,27 @@
+--- a/events.py
++++ b/events.py
+@@ -1,2 +1,4 @@
+ class Event:
+-    def __init__(self, name: str): self.name = name
++    def __init__(self, name: str, payload=None):
++        self.name = name
++        self.payload = payload
+
+--- a/handlers.py
++++ b/handlers.py
+@@ -1,2 +1,3 @@
+ class Handler:
+-    def handle(self, event): pass
++    def handle(self, event):
++        raise NotImplementedError()
+
+--- a/bus.py
++++ b/bus.py
+@@ -4,4 +4,6 @@
+     def __init__(self):
+         self.handlers = []
+     def register(self, h): self.handlers.append(h)
+-    def dispatch(self, e): pass
++    def dispatch(self, e):
++        for h in self.handlers:
++            h.handle(e)

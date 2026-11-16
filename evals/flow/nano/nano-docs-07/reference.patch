@@ -1,0 +1,7 @@
+--- a/rev.py
++++ b/rev.py
+@@ -1 +1,3 @@
+-def reverse_str(s): return s[::-1]
++def reverse_str(s):
++    """Reverse string."""
++    return s[::-1]

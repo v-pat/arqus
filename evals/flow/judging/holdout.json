@@ -1,0 +1,10 @@
+{
+  "holdout": [
+    "judge-py-s-03",
+    "judge-py-l-02",
+    "judge-rs-s-03",
+    "judge-go-m-03",
+    "judge-ts-m-03",
+    "judge-ts-l-02"
+  ]
+}

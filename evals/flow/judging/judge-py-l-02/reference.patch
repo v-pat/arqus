@@ -1,0 +1,14 @@
+--- a/cache.py
++++ b/cache.py
+@@ -4,5 +4,9 @@
+     def __init__(self):
+         self.policy = Policy()
+         self.backend = MemoryBackend()
+-    def get(self, k): return None
+-    def set(self, k, v): pass
++    def get(self, k):
++        if not self.policy.is_allowed(k): return None
++        return self.backend.read(k)
++    def set(self, k, v):
++        if self.policy.is_allowed(k):
++            self.backend.write(k, v)

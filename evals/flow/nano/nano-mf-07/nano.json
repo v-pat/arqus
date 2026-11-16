@@ -1,0 +1,25 @@
+{
+  "name": "nano-mf-07",
+  "category": "multi_file",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-mf-07",
+    "objective": "Update service in service_7.py and client in client_7.py",
+    "category": "multi_file",
+    "context_files": [
+      "service_7.py",
+      "client_7.py"
+    ],
+    "allowed_writes": [
+      "service_7.py",
+      "client_7.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

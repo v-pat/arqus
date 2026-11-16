@@ -1,0 +1,14 @@
+--- a/words.go
++++ b/words.go
+@@ -1,5 +1,10 @@
+ package judge
++import "strings"
+ 
+ func CountWords(s string) map[string]int {
+-    return nil
++    m := make(map[string]int)
++    for _, w := range strings.Fields(s) {
++        m[w]++
++    }
++    return m
+ }

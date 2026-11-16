@@ -1,0 +1,5 @@
+--- a/test_mul.py
++++ b/test_mul.py
+@@ -1 +1 @@
+-# TODO
++def test_mul(): assert 3 * 4 == 12

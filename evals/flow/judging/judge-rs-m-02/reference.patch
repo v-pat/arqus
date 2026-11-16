@@ -1,0 +1,12 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,2 +1,9 @@
++use std::fmt;
+ #[derive(Debug, PartialEq, Eq)]
+ pub struct SemVer { pub major: u32, pub minor: u32, pub patch: u32 }
++
++impl fmt::Display for SemVer {
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
++    }
++}

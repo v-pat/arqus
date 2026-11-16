@@ -1,0 +1,5 @@
+--- a/math_fn.py
++++ b/math_fn.py
+@@ -1 +1 @@
+-def square(x): pass
++def square(x): return x * x

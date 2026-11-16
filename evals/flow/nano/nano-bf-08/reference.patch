@@ -1,0 +1,6 @@
+--- a/math_cmp.py
++++ b/math_cmp.py
+@@ -1,2 +1,2 @@
+ def is_close(a, b):
+-    return a == b
++    return abs(a - b) < 1e-5

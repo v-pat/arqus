@@ -1,0 +1,23 @@
+{
+  "name": "nano-sf-04",
+  "category": "single_function",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-sf-04",
+    "objective": "Implement abs_diff(a, b)",
+    "category": "single_function",
+    "context_files": [
+      "diff.py"
+    ],
+    "allowed_writes": [
+      "diff.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

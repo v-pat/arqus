@@ -1,0 +1,10 @@
+--- a/tree.go
++++ b/tree.go
+@@ -3,5 +3,6 @@
+ type Node struct { Val int; Left, Right *Node }
+ 
+ func FindMax(n *Node) (int, bool) {
+-    return n.Val, true // panics if n == nil
++    if n == nil { return 0, false }
++    return n.Val, true
+ }

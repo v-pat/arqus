@@ -1,0 +1,14 @@
+--- a/config.go
++++ b/config.go
+@@ -1,4 +1,10 @@
+ package judge
++import "errors"
+ 
+ type Config struct { Port int; Host string }
+-func (c *Config) Validate() error { return nil }
++
++func (c *Config) Validate() error {
++    if c.Port <= 0 || c.Port > 65535 { return errors.New("invalid port") }
++    if c.Host == "" { return errors.New("empty host") }
++    return nil
++}

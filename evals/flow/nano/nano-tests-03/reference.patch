@@ -1,0 +1,5 @@
+--- a/test_sub.py
++++ b/test_sub.py
+@@ -1 +1 @@
+-# TODO
++def test_sub(): assert 10 - 4 == 6

@@ -1,0 +1,7 @@
+--- a/fact.py
++++ b/fact.py
+@@ -1 +1,3 @@
+-def fact(n): return 1 if n <= 1 else n * fact(n-1)
++def fact(n):
++    """Compute factorial of n."""
++    return 1 if n <= 1 else n * fact(n-1)

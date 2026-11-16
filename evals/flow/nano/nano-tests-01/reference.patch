@@ -1,0 +1,5 @@
+--- a/test_calc.py
++++ b/test_calc.py
+@@ -1 +1 @@
+-# TODO
++def test_add(): assert 1 + 1 == 2

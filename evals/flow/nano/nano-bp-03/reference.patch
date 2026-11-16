@@ -1,0 +1,6 @@
+--- a/vec.py
++++ b/vec.py
+@@ -1,2 +1,3 @@
+ class Vector2D:
+     def __init__(self, x, y): self.x = x; self.y = y
++    def __eq__(self, o): return isinstance(o, Vector2D) and (self.x, self.y) == (o.x, o.y)

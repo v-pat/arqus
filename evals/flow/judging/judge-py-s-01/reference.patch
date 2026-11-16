@@ -1,0 +1,6 @@
+--- a/math_utils.py
++++ b/math_utils.py
+@@ -1,2 +1,2 @@
+ def clamp(val: float, min_val: float, max_val: float) -> float:
+-    pass
++    return max(min_val, min(val, max_val))

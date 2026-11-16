@@ -1,0 +1,23 @@
+{
+  "name": "nano-bf-02",
+  "category": "local_bugfix",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-bf-02",
+    "objective": "Fix index error on empty list in first_item in lst.py",
+    "category": "local_bugfix",
+    "context_files": [
+      "lst.py"
+    ],
+    "allowed_writes": [
+      "lst.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

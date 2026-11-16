@@ -1,0 +1,22 @@
+{
+  "name": "judge-rs-s-02",
+  "language": "rust",
+  "size": "S",
+  "category": "local_bugfix",
+  "repo": "setup",
+  "objective": "Fix off-by-one bug in binary_search in src/lib.rs",
+  "public_verify": [
+    "cargo test --test test_pub"
+  ],
+  "hidden_verify": [
+    "cargo test --test test_hid"
+  ],
+  "regression_verify": [
+    "cargo test --test test_reg"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}

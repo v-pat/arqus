@@ -1,0 +1,23 @@
+{
+  "name": "nano-bp-07",
+  "category": "boilerplate",
+  "repo": "setup",
+  "contract": {
+    "id": "T01",
+    "title": "Nano contract: nano-bp-07",
+    "objective": "Implement contains on Range in rng.py",
+    "category": "boilerplate",
+    "context_files": [
+      "rng.py"
+    ],
+    "allowed_writes": [
+      "rng.py"
+    ],
+    "verify_command": "python3 test_hid.py",
+    "estimated_changed_lines": 25
+  },
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "reference_patch": "reference.patch"
+}

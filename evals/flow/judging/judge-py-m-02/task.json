@@ -1,0 +1,22 @@
+{
+  "name": "judge-py-m-02",
+  "language": "python",
+  "size": "M",
+  "category": "tests",
+  "repo": "setup",
+  "objective": "Write test cases in test_query.py for build_query parameter encoding",
+  "public_verify": [
+    "python3 test_pub.py"
+  ],
+  "hidden_verify": [
+    "python3 test_hid.py"
+  ],
+  "regression_verify": [
+    "python3 test_reg.py"
+  ],
+  "protected": [
+    "test_*.py",
+    "*_test.*"
+  ],
+  "reference_patch": "reference.patch"
+}
