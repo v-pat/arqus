@@ -249,3 +249,27 @@ fn test_two_role_keys_redaction() {
     assert!(!redacted.contains(key2));
     assert!(redacted.contains("[REDACTED]"));
 }
+
+#[test]
+fn test_resolve_api_key_from_auth_json() {
+    let home = tempdir().unwrap();
+    let auth = r#"{"test_provider":{"type":"api","key":"mock-auth-key-value-123"}}"#;
+    fs::write(home.path().join("auth.json"), auth).unwrap();
+    let key = resolve_api_key_with_context(
+        "ARQUS_NONEXISTENT_KEY_XYZ",
+        "test_provider",
+        Some(home.path()),
+    )
+    .unwrap();
+    assert_eq!(key, "mock-auth-key-value-123");
+}
+
+#[test]
+fn test_resolve_api_key_from_fallback_env() {
+    let home = tempdir().unwrap();
+    std::env::set_var("OPENROUTER_API_KEY", "mock-env-key-value-456");
+    let key =
+        resolve_api_key_with_context("ARQUS_NONEXISTENT_KEY_ABC", "openrouter", Some(home.path()));
+    std::env::remove_var("OPENROUTER_API_KEY");
+    assert_eq!(key.unwrap(), "mock-env-key-value-456");
+}

@@ -12,17 +12,92 @@ pub use defaults::*;
 pub use types::*;
 
 pub fn resolve_api_key(api_key_env: &str) -> Result<String, FlowError> {
+    resolve_api_key_with_context(api_key_env, "", None)
+}
+
+pub fn resolve_api_key_with_context(
+    api_key_env: &str,
+    provider: &str,
+    home: Option<&Path>,
+) -> Result<String, FlowError> {
     let trimmed = api_key_env.trim();
     if trimmed.is_empty() {
         return Ok("local".to_string());
     }
-    match std::env::var(trimmed) {
-        Ok(key) if !key.is_empty() => {
+    // 1. Explicit env var
+    if let Ok(key) = std::env::var(trimmed) {
+        if !key.trim().is_empty() {
             crate::debug::register_redacted_key(&key);
-            Ok(key)
+            return Ok(key);
         }
-        _ => Err(FlowError::MissingApiKeyEnv(trimmed.to_string())),
     }
+    // 2. Common fallback env vars
+    let provider_env = match provider.to_ascii_lowercase().as_str() {
+        "openrouter" => Some("OPENROUTER_API_KEY"),
+        "anthropic" => Some("ANTHROPIC_API_KEY"),
+        "openai" => Some("OPENAI_API_KEY"),
+        _ => None,
+    };
+    if let Some(penv) = provider_env {
+        if let Ok(key) = std::env::var(penv) {
+            if !key.trim().is_empty() {
+                crate::debug::register_redacted_key(&key);
+                return Ok(key);
+            }
+        }
+    }
+    if trimmed == "ARQUS_API_KEY" {
+        for fallback in ["OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"] {
+            if let Ok(key) = std::env::var(fallback) {
+                if !key.trim().is_empty() {
+                    crate::debug::register_redacted_key(&key);
+                    return Ok(key);
+                }
+            }
+        }
+    }
+    // 3. Saved key in auth.json (<home>/auth.json, <home>/.arqus/auth.json, ~/.arqus/auth.json)
+    let mut auth_paths = Vec::new();
+    if let Some(h) = home {
+        auth_paths.push(h.join("auth.json"));
+        auth_paths.push(h.join(".arqus").join("auth.json"));
+    }
+    auth_paths.push(crate::home::arqus_home().join("auth.json"));
+    if let Some(user_home) = dirs::home_dir() {
+        auth_paths.push(user_home.join(".arqus").join("auth.json"));
+    }
+
+    for auth_path in auth_paths {
+        if let Ok(store) = crate::auth::AuthStore::load(&auth_path) {
+            if !provider.is_empty() {
+                if let Some(key) = store.get_key(provider) {
+                    if !key.trim().is_empty() {
+                        crate::debug::register_redacted_key(key);
+                        return Ok(key.to_string());
+                    }
+                }
+            }
+            if trimmed == "ARQUS_API_KEY" {
+                for prov in ["openrouter", "anthropic", "openai"] {
+                    if let Some(key) = store.get_key(prov) {
+                        if !key.trim().is_empty() {
+                            crate::debug::register_redacted_key(key);
+                            return Ok(key.to_string());
+                        }
+                    }
+                }
+                if let Some((_, cred)) = store.providers.iter().next() {
+                    let crate::auth::Credential::Api { key } = cred;
+                    if !key.trim().is_empty() {
+                        crate::debug::register_redacted_key(key);
+                        return Ok(key.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    Err(FlowError::MissingApiKeyEnv(trimmed.to_string()))
 }
 
 pub fn load_flow_config(
@@ -33,6 +108,7 @@ pub fn load_flow_config(
     let mut settings = default_flow_settings();
     let paths = [
         home.join("settings.json"),
+        home.join(".arqus").join("settings.json"),
         cwd.join(".arqus").join("settings.json"),
     ];
     for path in paths {
@@ -82,10 +158,14 @@ pub fn load_flow_config(
         eprintln!("warning: routing.by_category is ignored in v1");
     }
 
-    let orchestrator_key = resolve_api_key(&orchestrator.api_key_env)?;
+    let orchestrator_key = resolve_api_key_with_context(
+        &orchestrator.api_key_env,
+        &orchestrator.provider,
+        Some(home),
+    )?;
     let mut worker_keys = BTreeMap::new();
     for worker in &workers {
-        let key = resolve_api_key(&worker.api_key_env)?;
+        let key = resolve_api_key_with_context(&worker.api_key_env, &worker.provider, Some(home))?;
         worker_keys.insert(worker.name.clone(), key);
     }
 

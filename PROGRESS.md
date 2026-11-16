@@ -1934,6 +1934,22 @@
 - Known problems / TODO:
   - None. All unit tests, integration tests, and check scripts pass.
 
+## Fix: Flow / Nanoflow API Key Resolution via auth.json and Fallback Env Vars   [DONE]
+- Files created or changed:
+  - `src/flow/config/mod.rs`: implemented `resolve_api_key_with_context` checking explicit env var, provider-specific env var (e.g. `OPENROUTER_API_KEY`), `ARQUS_API_KEY` fallbacks, and saved keys in `<home>/auth.json`, `<home>/.arqus/auth.json`, and `~/.arqus/auth.json`. Updated `load_flow_config` to pass context and resolve keys seamlessly from saved credentials.
+  - `src/flow/config/tests.rs`: added unit tests `test_resolve_api_key_from_auth_json` and `test_resolve_api_key_from_fallback_env`.
+  - `PROGRESS.md`: updated progress log.
+- What works (command + short real output):
+  - `cargo test --bin arqus flow::config` -> `test result: ok. 14 passed; 0 failed; finished in 0.01s`
+  - `./scripts/audit-flow.sh` -> `audit-flow: all checks passed`
+  - `./scripts/check.sh` -> `all checks passed`
+- Assumptions:
+  - If a user connects a provider via TUI `/connect`, the saved key in `auth.json` is used for orchestrator/worker roles matching that provider or default `ARQUS_API_KEY` configuration.
+- Known problems / TODO:
+  - None.
+
+
+
 
 
 
